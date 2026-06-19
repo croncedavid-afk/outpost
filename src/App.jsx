@@ -4,6 +4,8 @@ import RadarTab from './tabs/RadarTab.jsx';
 import UnitsOutTab from './tabs/UnitsOutTab.jsx';
 import SendOutTab from './tabs/SendOutTab.jsx';
 import ApprovalsTab from './tabs/ApprovalsTab.jsx';
+import ROPage from './ROPage.jsx';
+import UnitTab from './UnitTab.jsx';
 
 // ── Auth: shell handoff (read synchronously before first render) ──
 function readInitialUser() {
@@ -40,6 +42,13 @@ export default function App() {
   const [locLoading, setLocLoading] = useState(true);
   const [pickList, setPickList] = useState(null); // owner-level: [{id,code,name,service_model}] to choose from
   const [pickedId, setPickedId] = useState(null); // owner-level chosen terminal id
+
+  // full-page overlay: open an outside RO or a unit file over the tabs (Back returns)
+  // shape: { type: 'ro', ro } | { type: 'unit', unitId }
+  const [overlay, setOverlay] = useState(null);
+  const openRO = useCallback((ro) => setOverlay({ type: 'ro', ro }), []);
+  const openUnit = useCallback((unitId) => setOverlay({ type: 'unit', unitId }), []);
+  const closeOverlay = useCallback(() => setOverlay(null), []);
 
   // apply saved theme + accent
   useEffect(() => {
@@ -158,7 +167,8 @@ export default function App() {
 
   // full access only at vendor-based terminals; everyone else is read-only
   const fullAccess = serviceModel === 'vendor_based';
-  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab };
+  const readOnly = !fullAccess;
+  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab, openRO, openUnit, readOnly };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--page-bg)' }}>
@@ -206,6 +216,36 @@ export default function App() {
         })}
       </div>
 
+      {/* full-page overlay (outside RO or unit file) — sits over the tabs */}
+      {overlay && loc && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'var(--page-bg)', overflow: 'auto' }}>
+          <div style={{ background: 'var(--nav-bg)', color: 'var(--nav-text)', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button className="btn btn-sm" onClick={closeOverlay} style={{ background: 'rgba(255,255,255,0.10)', color: '#fff', border: '1px solid rgba(255,255,255,0.20)' }}>← Back</button>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{overlay.type === 'ro' ? 'Outside Repair Order' : 'Unit File'}</span>
+            {readOnly && <span className="badge" style={{ background: 'rgba(255,255,255,0.10)', color: '#bbb' }}>read-only</span>}
+          </div>
+          {overlay.type === 'ro' ? (
+            <ROPage
+              ro={overlay.ro}
+              user={user}
+              isTech={false}
+              readOnly={readOnly}
+              kind="outside"
+              onBack={closeOverlay}
+            />
+          ) : (
+            <UnitTab
+              user={user}
+              locationId={loc.id}
+              deepUnitId={overlay.unitId}
+              readOnly={readOnly}
+              onOpenUnit={openUnit}
+              onDeepConsumed={() => {}}
+            />
+          )}
+        </div>
+      )}
+
       {/* body */}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {locLoading ? <div className="loading">Loading terminal…</div> : !loc ? (
@@ -222,3 +262,4 @@ export default function App() {
     </div>
   );
 }
+
