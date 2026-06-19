@@ -23,6 +23,8 @@ function readInitialUser() {
 }
 
 const ROLES_ALLOWED = ['terminal_manager', 'manager', 'director', 'vp', 'superadmin', 'admin', 'business', 'regional_manager'];
+// Roles that may see + act on the Approvals tab (dispatcher excluded).
+const APPROVER_ROLES = ['manager', 'terminal_manager', 'director', 'vp', 'admin', 'superadmin'];
 
 const TABS = [
   { id: 'radar', label: 'Radar', icon: 'M' },
@@ -168,7 +170,8 @@ export default function App() {
   // full access only at vendor-based terminals; everyone else is read-only
   const fullAccess = serviceModel === 'vendor_based';
   const readOnly = !fullAccess;
-  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab, openRO, openUnit, readOnly };
+  const canApprove = APPROVER_ROLES.includes(user.role);
+  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab, openRO, openUnit, readOnly, canApprove };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--page-bg)' }}>
@@ -204,6 +207,8 @@ export default function App() {
         {TABS.map(t => {
           // hide Send Out + Approvals when read-only (managed-by-shop terminals)
           if (!fullAccess && (t.id === 'send_out' || t.id === 'approvals')) return null;
+          // Approvals is only for approver roles (dispatcher excluded)
+          if (t.id === 'approvals' && !canApprove) return null;
           const on = activeTab === t.id;
           return (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
@@ -255,7 +260,7 @@ export default function App() {
             {activeTab === 'radar' && <RadarTab ctx={ctx} />}
             {activeTab === 'units_out' && <UnitsOutTab ctx={ctx} />}
             {activeTab === 'send_out' && fullAccess && <SendOutTab ctx={ctx} />}
-            {activeTab === 'approvals' && fullAccess && <ApprovalsTab ctx={ctx} />}
+            {activeTab === 'approvals' && fullAccess && canApprove && <ApprovalsTab ctx={ctx} />}
           </>
         )}
       </div>
