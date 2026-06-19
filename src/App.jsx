@@ -81,9 +81,14 @@ export default function App() {
             const { data: profs } = await sb.from('location_profiles').select('location_id,service_model').in('location_id', ids);
             (profs || []).forEach(p => { sm[p.location_id] = p.service_model; });
           }
-          // exclude the logical 'shared_fleet' bucket from the picker
+          // exclude the logical 'shared_fleet' bucket from the selector
           const list = (locs || []).filter(l => l.id !== 'shared_fleet').map(l => ({ ...l, service_model: sm[l.id] || null }));
-          if (alive) { setPickList(list); setLoc(null); setLocLoading(false); }
+          if (alive) {
+            setPickList(list);
+            // default to the first terminal so there's no landing wall; dropdown lets them switch
+            if (list.length) { setPickedId(list[0].id); }
+            else { setLoc(null); setLocLoading(false); }
+          }
         } else {
           if (alive) { setLoc(null); setLocLoading(false); }
         }
@@ -161,8 +166,20 @@ export default function App() {
       <div style={{ background: 'var(--nav-bg)', color: 'var(--nav-text)', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 18 }}>📡</span>
         <span style={{ fontWeight: 600, fontSize: 15 }}>Outpost</span>
-        {loc && <span className="badge" style={{ background: 'rgba(120,200,150,0.15)', color: '#7fdcab' }}>{loc.code} {loc.name?.replace(' Terminal', '')}</span>}
-        {loc && isOwnerLevel && <button className="btn btn-sm" onClick={() => { setPickedId(null); setLoc(null); setServiceModel(null); }} style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', padding: '3px 9px' }}>Switch terminal</button>}
+        {loc && isOwnerLevel && pickList && pickList.length > 0 ? (
+          <select
+            value={pickedId || loc.id}
+            onChange={e => { setLoc(null); setServiceModel(null); setLocLoading(true); setPickedId(e.target.value); }}
+            style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 500, padding: '4px 8px', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.10)', color: '#fff', border: '1px solid rgba(255,255,255,0.20)', cursor: 'pointer' }}
+            title="Switch terminal"
+          >
+            {pickList.map(t => (
+              <option key={t.id} value={t.id} style={{ color: '#111' }}>{t.code} {t.name?.replace(' Terminal', '')}{t.service_model === 'vendor_based' ? ' (vendor)' : ''}</option>
+            ))}
+          </select>
+        ) : loc && (
+          <span className="badge" style={{ background: 'rgba(120,200,150,0.15)', color: '#7fdcab' }}>{loc.code} {loc.name?.replace(' Terminal', '')}</span>
+        )}
         {!locLoading && (
           fullAccess
             ? <span className="badge" style={{ background: 'rgba(110,150,240,0.15)', color: '#9cc2ff' }}>vendor-based · full access</span>
@@ -191,25 +208,7 @@ export default function App() {
 
       {/* body */}
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {locLoading ? <div className="loading">Loading terminal…</div> : (!loc && pickList) ? (
-          <div style={{ padding: 24, maxWidth: 560, margin: '0 auto' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)', textTransform: 'uppercase', marginBottom: 10 }}>Choose a terminal</div>
-            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Your account oversees the whole fleet, so pick which terminal's Outpost to view.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {pickList.map(t => (
-                <button key={t.id} onClick={() => setPickedId(t.id)} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: '1px solid var(--border)' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, fontSize: 14, minWidth: 50 }}>{t.code}</span>
-                  <span style={{ fontSize: 13, flex: 1 }}>{t.name}</span>
-                  {t.service_model === 'vendor_based'
-                    ? <span className="badge badge-blue">vendor-based</span>
-                    : t.service_model === 'in_house_shop'
-                    ? <span className="badge badge-muted">in-house shop</span>
-                    : <span className="badge badge-muted">unset</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : !loc ? (
+        {locLoading ? <div className="loading">Loading terminal…</div> : !loc ? (
           <div className="loading">No terminal is linked to your account. Contact your administrator.</div>
         ) : (
           <>
