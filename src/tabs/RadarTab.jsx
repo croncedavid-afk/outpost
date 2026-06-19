@@ -140,6 +140,8 @@ function ForecastPanel({ ctx, overdue, dueSoon }) {
       const res = await fetch('/api/predict-pm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ company_id: user.company_id, location_id: loc.id, units, fingerprint, meta }) });
       const data = await res.json();
       if (data.error === 'not_configured') { setNote("AI forecast isn't configured yet — add the Anthropic API key in Netlify and redeploy."); setBusy(false); return; }
+      if (data.error === 'empty_parse') { setNote('The forecast came back empty this time — please tap Forecast again.'); setBusy(false); return; }
+      if (data.error === 'no_units') { setNote('No overdue or coming-due units to forecast right now.'); setBusy(false); return; }
       if (data.error) { setNote('Forecast failed: ' + (data.detail || data.error)); setBusy(false); return; }
       setStatus(data.status || '');
       if (data.status === 'limit_reached') { setNote(data.message || ''); if (data.forecast) setForecast(data.forecast); if (data.ran_at) setRanAt(data.ran_at); }
@@ -147,6 +149,7 @@ function ForecastPanel({ ctx, overdue, dueSoon }) {
         setForecast(data.forecast || []); setRanAt(data.ran_at || null);
         if (data.status === 'reused_daily') setNote('Already forecasted today — showing the latest. Fresh run available tomorrow.');
         else if (data.status === 'reused_unchanged') setNote('No unit data changed since the last forecast — showing the saved result (no run used).');
+        else if (data.status === 'fresh' && data.partial) setNote('Forecast complete. A few units were skipped this run — tap Refresh tomorrow to fill them in.');
       }
     } catch (e) { setNote('Forecast failed: ' + String(e)); }
     setBusy(false);
