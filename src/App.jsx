@@ -38,6 +38,8 @@ export default function App() {
   const [loc, setLoc] = useState(null);          // { id, code, name }
   const [serviceModel, setServiceModel] = useState(null); // 'vendor_based' | 'in_house_shop' | null
   const [locLoading, setLocLoading] = useState(true);
+  const [pickList, setPickList] = useState(null); // owner-level: [{id,code,name,service_model}] to choose from
+  const [pickedId, setPickedId] = useState(null); // owner-level chosen terminal id
 
   // apply saved theme + accent
   useEffect(() => {
@@ -58,17 +60,38 @@ export default function App() {
     })();
   }, [user?.id]);
 
-  // resolve the user's location + its service_model (the two-tier gate)
+  // platform-owner / multi-location roles can pick any terminal
+  const isOwnerLevel = ['business', 'superadmin', 'admin', 'vp', 'director', 'regional_manager'].includes(user?.role);
+
+  // resolve the active terminal + its service_model (the two-tier gate).
+  // Priority: owner-picked terminal -> user's own location_id -> (owner) show a picker.
   useEffect(() => {
     if (!user) { setLocLoading(false); return; }
     let alive = true;
     (async () => {
       setLocLoading(true);
-      const locId = user.location_id || null;
-      if (!locId) { if (alive) { setLoc(null); setLocLoading(false); } return; }
+      const activeId = pickedId || user.location_id || null;
+      if (!activeId) {
+        // No terminal on the account. Owner-level users pick one; everyone else gets the no-terminal message.
+        if (isOwnerLevel) {
+          const { data: locs } = await sb.from('locations').select('id,code,name').eq('company_id', user.company_id).order('code');
+          const ids = (locs || []).map(l => l.id);
+          let sm = {};
+          if (ids.length) {
+            const { data: profs } = await sb.from('location_profiles').select('location_id,service_model').in('location_id', ids);
+            (profs || []).forEach(p => { sm[p.location_id] = p.service_model; });
+          }
+          // exclude the logical 'shared_fleet' bucket from the picker
+          const list = (locs || []).filter(l => l.id !== 'shared_fleet').map(l => ({ ...l, service_model: sm[l.id] || null }));
+          if (alive) { setPickList(list); setLoc(null); setLocLoading(false); }
+        } else {
+          if (alive) { setLoc(null); setLocLoading(false); }
+        }
+        return;
+      }
       const [{ data: l }, { data: p }] = await Promise.all([
-        sb.from('locations').select('id,code,name').eq('id', locId).maybeSingle(),
-        sb.from('location_profiles').select('service_model,complexity_rating').eq('location_id', locId).maybeSingle(),
+        sb.from('locations').select('id,code,name').eq('id', activeId).maybeSingle(),
+        sb.from('location_profiles').select('service_model,complexity_rating').eq('location_id', activeId).maybeSingle(),
       ]);
       if (!alive) return;
       if (l) setLoc(l);
@@ -76,10 +99,7 @@ export default function App() {
       setLocLoading(false);
     })();
     return () => { alive = false; };
-  }, [user?.location_id, user]);
-
-  // platform-owner / multi-location roles can pick any terminal
-  const isOwnerLevel = ['business', 'superadmin', 'admin', 'vp', 'director', 'regional_manager'].includes(user?.role);
+  }, [user?.location_id, pickedId, user, isOwnerLevel]);
 
   async function doLogin() {
     setLoginErr('');
@@ -142,6 +162,7 @@ export default function App() {
         <span style={{ fontSize: 18 }}>📡</span>
         <span style={{ fontWeight: 600, fontSize: 15 }}>Outpost</span>
         {loc && <span className="badge" style={{ background: 'rgba(120,200,150,0.15)', color: '#7fdcab' }}>{loc.code} {loc.name?.replace(' Terminal', '')}</span>}
+        {loc && isOwnerLevel && <button className="btn btn-sm" onClick={() => { setPickedId(null); setLoc(null); setServiceModel(null); }} style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', padding: '3px 9px' }}>Switch terminal</button>}
         {!locLoading && (
           fullAccess
             ? <span className="badge" style={{ background: 'rgba(110,150,240,0.15)', color: '#9cc2ff' }}>vendor-based · full access</span>
@@ -170,7 +191,25 @@ export default function App() {
 
       {/* body */}
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {locLoading ? <div className="loading">Loading terminal…</div> : !loc ? (
+        {locLoading ? <div className="loading">Loading terminal…</div> : (!loc && pickList) ? (
+          <div style={{ padding: 24, maxWidth: 560, margin: '0 auto' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)', textTransform: 'uppercase', marginBottom: 10 }}>Choose a terminal</div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Your account oversees the whole fleet, so pick which terminal's Outpost to view.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {pickList.map(t => (
+                <button key={t.id} onClick={() => setPickedId(t.id)} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', border: '1px solid var(--border)' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, fontSize: 14, minWidth: 50 }}>{t.code}</span>
+                  <span style={{ fontSize: 13, flex: 1 }}>{t.name}</span>
+                  {t.service_model === 'vendor_based'
+                    ? <span className="badge badge-blue">vendor-based</span>
+                    : t.service_model === 'in_house_shop'
+                    ? <span className="badge badge-muted">in-house shop</span>
+                    : <span className="badge badge-muted">unset</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : !loc ? (
           <div className="loading">No terminal is linked to your account. Contact your administrator.</div>
         ) : (
           <>
