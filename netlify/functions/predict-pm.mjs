@@ -114,41 +114,78 @@ export default async (req) => {
     return json({ status: 'limit_reached', message: QUIRKY_LIMIT, forecast: prev ? prev.forecast : [], ran_at: prev ? prev.ran_at : null, used: usedThisWeek, cap: WEEKLY_CAP });
   }
 
-  // ── run the model ──
+  // ── run the model (BATCHED) ──────────────────────────────────────────────
+  // Output size scales with unit count; a single call truncates at max_tokens for
+  // large terminals (this is what produced empty forecasts). Batch the units so the
+  // output per call is bounded, then merge. One logical "run" regardless of batches.
+  const BATCH_SIZE = 8;
+  const MAX_TOKENS = 4096;
   const baseRow = {
     company_id, company_name: meta.company_name || null,
     user_id: meta.user_id || null, user_name: meta.user_name || null, user_role: meta.user_role || null,
     location_id, feature: 'predict_pm', question: `PM forecast: ${units.length} units`, model: MODEL,
   };
-  const userContent = `Units to forecast (JSON). Use ONLY these numbers.\n\n${JSON.stringify({ units })}`;
-  const t0 = Date.now();
-  try {
+
+  function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
+
+  async function runBatch(batchUnits) {
+    const userContent = `Units to forecast (JSON). Use ONLY these numbers.\n\n${JSON.stringify({ units: batchUnits })}`;
+    const t0 = Date.now();
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 2048, system: SYSTEM, messages: [{ role: 'user', content: userContent }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, system: SYSTEM, messages: [{ role: 'user', content: userContent }] }),
     });
-    const data = await r.json();
     const latency_ms = Date.now() - t0;
+    let data = {};
+    try { data = await r.json(); } catch { data = {}; }
     if (!r.ok) {
-      await logUsage({ ...baseRow, latency_ms, had_error: true, error_type: (data && data.error && data.error.type) || ('http_' + r.status) });
-      return json({ error: 'api_error', detail: (data && data.error && data.error.message) || ('HTTP ' + r.status) });
+      return { ok: false, units: [], latency_ms, error_type: (data && data.error && data.error.type) || ('http_' + r.status), detail: (data && data.error && data.error.message) || ('HTTP ' + r.status), usage: {} };
     }
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-    let parsed;
-    try { parsed = JSON.parse(text.replace(/^```json\s*/i, '').replace(/```$/,'').trim()); }
-    catch { parsed = { units: [] }; }
-    const forecast = Array.isArray(parsed.units) ? parsed.units : [];
-    const u = data.usage || {};
-    await logUsage({ ...baseRow, latency_ms, input_tokens: u.input_tokens ?? null, output_tokens: u.output_tokens ?? null, had_error: false });
-    await sbUpsertForecast({
-      company_id, location_id, forecast, fingerprint,
-      unit_count: units.length, ran_at: new Date().toISOString(),
-      ran_by: meta.user_id || null, ran_by_name: meta.user_name || null,
-    });
-    return json({ status: 'fresh', forecast, ran_at: new Date().toISOString(), used: usedThisWeek + 1, cap: WEEKLY_CAP });
+    // strip optional code fences, tolerate a trailing truncation by trying a best-effort parse
+    let parsed = null;
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/```$/,'').trim();
+    try { parsed = JSON.parse(cleaned); }
+    catch { parsed = null; }
+    const fc = parsed && Array.isArray(parsed.units) ? parsed.units : [];
+    const stopReason = data.stop_reason || null;
+    return { ok: true, units: fc, latency_ms, usage: data.usage || {}, stop_reason: stopReason };
+  }
+
+  try {
+    const batches = chunk(units, BATCH_SIZE);
+    let forecast = [];
+    let totalLatency = 0, totalIn = 0, totalOut = 0;
+    let anyBatchError = null;
+    let truncated = false;
+
+    for (const b of batches) {
+      const res = await runBatch(b);
+      totalLatency += res.latency_ms || 0;
+      if (!res.ok) { anyBatchError = res; continue; }      // keep other batches
+      if (res.stop_reason === 'max_tokens') truncated = true;
+      forecast = forecast.concat(res.units || []);
+      totalIn += res.usage.input_tokens || 0;
+      totalOut += res.usage.output_tokens || 0;
+    }
+
+    // Log ONE usage row for the whole run (keeps weekly-cap accounting at 1/run).
+    if (forecast.length > 0) {
+      await logUsage({ ...baseRow, latency_ms: totalLatency, input_tokens: totalIn || null, output_tokens: totalOut || null, had_error: false });
+      await sbUpsertForecast({
+        company_id, location_id, forecast, fingerprint,
+        unit_count: units.length, ran_at: new Date().toISOString(),
+        ran_by: meta.user_id || null, ran_by_name: meta.user_name || null,
+      });
+      return json({ status: 'fresh', forecast, ran_at: new Date().toISOString(), used: usedThisWeek + 1, cap: WEEKLY_CAP, partial: truncated || !!anyBatchError });
+    }
+
+    // Nothing parsed across all batches -> DO NOT save and DO NOT trip the daily lock.
+    await logUsage({ ...baseRow, latency_ms: totalLatency, had_error: true, error_type: anyBatchError ? (anyBatchError.error_type || 'api_error') : 'empty_parse' });
+    return json({ error: anyBatchError ? 'api_error' : 'empty_parse', detail: anyBatchError ? anyBatchError.detail : 'The model returned no usable forecast. Try again.' });
   } catch (e) {
-    await logUsage({ ...baseRow, latency_ms: Date.now() - t0, had_error: true, error_type: 'fetch_failed' });
+    await logUsage({ ...baseRow, latency_ms: 0, had_error: true, error_type: 'fetch_failed' });
     return json({ error: 'fetch_failed', detail: String(e) });
   }
 };
