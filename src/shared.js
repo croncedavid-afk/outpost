@@ -8,7 +8,12 @@ export const LOC_NUMBERS = {
   beaumont: '5212',
   diboll: '5213',
   baton_rouge: '2701',
+  st_gabriel: '2703',
+  la_terminal: '7042',
 };
+// NOTE: This map is only a fallback for RO-number generation. The real path passes
+// the live locations.code (from Location Hub) into generateRONumber, so new terminals
+// number correctly without editing this map.
 
 // Format: {code}-{seq4}{yy}  e.g. 5212-090026 (Beaumont's 900th RO of 2026).
 export function generateRONumber(locationCodeOrId, sequenceNum) {
