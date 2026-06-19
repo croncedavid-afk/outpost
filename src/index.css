@@ -1,0 +1,125 @@
+:root {
+  --nav-bg: #0a0a0a;
+  --nav-text: #ffffff;
+  --accent: #8e0000;
+  --accent2: #ff7a1a;
+  --page-bg: #e8e6e3;
+  --white: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.82);
+  --border: rgba(0, 0, 0, 0.10);
+  --border2: rgba(0, 0, 0, 0.18);
+  --text: #111111;
+  --muted: #666666;
+  --muted2: #999999;
+  --surface: rgba(255, 255, 255, 0.65);
+  --surface2: rgba(255, 255, 255, 0.88);
+  --surface3: #ffffff;
+  --green: #15803d;
+  --green-dim: rgba(21, 128, 61, 0.08);
+  --amber: #92400e;
+  --amber-dim: rgba(217, 119, 6, 0.08);
+  --blue: #1d4ed8;
+  --blue-dim: rgba(29, 78, 216, 0.08);
+  --red-dim: rgba(142, 0, 0, 0.07);
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.04);
+  --transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --accent-grad: linear-gradient(120deg, var(--accent) 0%, var(--accent2) 100%);
+  --accent-glow: 0 4px 20px rgba(142, 0, 0, .5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: var(--mono); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: var(--radius-sm);
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  transition: var(--transition);
+}
+.badge-green { background: var(--green-dim); color: var(--green); }
+.badge-amber { background: var(--amber-dim); color: var(--amber); }
+.badge-red { background: var(--red-dim); color: var(--accent); }
+.badge-blue { background: var(--blue-dim); color: var(--blue); }
+.badge-muted { color: var(--muted); border: 1px solid var(--border2); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  padding: 8px 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--border2); background: var(--surface2); color: var(--text);
+  cursor: pointer; transition: var(--transition); white-space: nowrap;
+}
+.btn:hover { background: var(--white); border-color: var(--accent); }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { font-size: 12px; padding: 5px 11px; }
+.btn-primary { background: var(--accent-grad); color: #fff; border: none; box-shadow: var(--accent-glow); }
+.btn-primary:hover { filter: brightness(1.06); }
+
+.card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
+}
+
+.input, .select, .textarea {
+  width: 100%; font-family: var(--sans); font-size: 14px;
+  padding: 9px 11px; border: 1px solid var(--border2);
+  border-radius: var(--radius-md); background: var(--white); color: var(--text);
+  transition: var(--transition);
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--red-dim);
+}
+
+.loading { padding: 40px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+
+:root[data-theme="dark"] {
+  --page-bg: #0a0e0d;
+  --white: #0e1412;
+  --card-bg: rgba(14, 20, 18, 0.85);
+  --border: rgba(120, 255, 180, 0.10);
+  --border2: rgba(120, 255, 180, 0.18);
+  --text: #e8efe9;
+  --muted: #8fb0a2;
+  --muted2: #5a7a6c;
+  --surface: rgba(120, 255, 180, 0.05);
+  --surface2: rgba(120, 255, 180, 0.08);
+  --surface3: #141a18;
+  --green-dim: rgba(34, 197, 94, 0.14);
+  --amber-dim: rgba(245, 158, 11, 0.13);
+  --blue-dim: rgba(59, 130, 246, 0.15);
+  --red-dim: rgba(239, 68, 68, 0.13);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme="dark"] body { background: var(--page-bg); color: var(--text); }
+:root[data-theme="dark"] .input,
+:root[data-theme="dark"] .select,
+:root[data-theme="dark"] .textarea {
+  background: var(--surface3); color: var(--text); border-color: var(--border2);
+}
+
+@media (max-width: 768px) {
+  html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+  input, select, textarea, .input, .select { font-size: 16px !important; }
+  button { touch-action: manipulation; }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+}
