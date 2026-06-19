@@ -7,6 +7,11 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/api/predict-pm"
+  to = "/.netlify/functions/predict-pm"
+  status = 200
+
+[[redirects]]
   from = "/.netlify/functions/*"
   to = "/.netlify/functions/:splat"
   status = 200
