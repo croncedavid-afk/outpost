@@ -12,24 +12,81 @@ function dwell(sent) {
   return { label, tone };
 }
 
+// Shop-Command-style typeahead: shows first results on focus, narrows as you type,
+// mobile-safe (onMouseDown + preventDefault so the tap registers before blur).
+function Typeahead({ placeholder, fetcher, display, meta, onPick, autoFocus }) {
+  const [value, setValue] = useState('');
+  const [rows, setRows] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    function onDown(e) { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('touchstart', onDown); };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try { const data = await fetcher(value.trim()); if (alive) setRows(data || []); }
+      finally { if (alive) setLoading(false); }
+    }, 200);
+    return () => { alive = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, open]);
+
+  async function openList() {
+    setOpen(true); setLoading(true);
+    try { const data = await fetcher(value.trim()); setRows(data || []); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div style={{ position: 'relative' }} ref={boxRef}>
+      <input
+        className="input"
+        value={value}
+        autoFocus={autoFocus}
+        placeholder={placeholder}
+        onFocus={openList}
+        onChange={(e) => { setValue(e.target.value); setOpen(true); }}
+      />
+      {open && (
+        <div className="card" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, maxHeight: 260, overflowY: 'auto' }}>
+          {loading && <div style={{ padding: '9px 12px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)' }}>Searching…</div>}
+          {!loading && rows.length === 0 && <div style={{ padding: '9px 12px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)' }}>No matches</div>}
+          {!loading && rows.map((r) => (
+            <div
+              key={r.id}
+              onMouseDown={(e) => { e.preventDefault(); setOpen(false); onPick(r); }}
+              style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 600 }}>{display(r)}</span>
+              {meta && <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted2)', whiteSpace: 'nowrap' }}>{meta(r)}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function UnitsOutTab({ ctx }) {
   const { loc, openRO, openUnit } = ctx;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // unit search (open any unit file at this terminal)
-  const [uq, setUq] = useState('');
-  const [uMatches, setUMatches] = useState([]);
-  const [uOpen, setUOpen] = useState(false);
-  const [uLoading, setULoading] = useState(false);
-  const searchRef = useRef(null);
+  // search mode: null (just the Search button) | 'choose' (two buttons) | 'unit' | 'ro'
+  const [searchMode, setSearchMode] = useState(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       setLoading(true);
-      // OPEN outside ROs at this terminal — outside_ros, not closed/reviewed yet.
-      // location_id is text (e.g. 'beaumont'); scope to this terminal directly.
       let q = sb.from('outside_ros')
         .select('id,ro_number,unit_number,vendor_name,current_notes,date_sent,estimated_cost,final_cost,status,odometer')
         .eq('location_id', loc.id)
@@ -45,35 +102,27 @@ export default function UnitsOutTab({ ctx }) {
     return () => { alive = false; };
   }, [loc.id, ctx.user.company_id]);
 
-  // close search dropdown on outside tap
-  useEffect(() => {
-    function onDown(e) { if (searchRef.current && !searchRef.current.contains(e.target)) setUOpen(false); }
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('touchstart', onDown);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('touchstart', onDown); };
-  }, []);
-
-  async function loadUnits(term) {
-    setULoading(true);
-    try {
-      let query = sb.from('units')
-        .select('id,unit_number,unit_type,year,make,model,mileage')
-        .eq('location_id', loc.id)
-        .order('unit_number')
-        .limit(8);
-      if (ctx.user.company_id) query = query.eq('company_id', ctx.user.company_id);
-      if (term) query = query.ilike('unit_number', term + '%');
-      const { data } = await query;
-      setUMatches(data || []);
-    } finally { setULoading(false); }
+  // fetchers (scoped to this terminal + company), mirror Shop Command behavior
+  async function fetchUnits(term) {
+    let q = sb.from('units').select('id,unit_number,unit_type,year,make,model,mileage')
+      .eq('location_id', loc.id).order('unit_number').limit(10);
+    if (ctx.user.company_id) q = q.eq('company_id', ctx.user.company_id);
+    if (term) q = q.ilike('unit_number', term + '%');
+    const { data } = await q;
+    return data || [];
   }
-  useEffect(() => {
-    if (!uOpen) return;
-    let alive = true;
-    const t = setTimeout(() => { if (alive) loadUnits(uq.trim()); }, 200);
-    return () => { alive = false; clearTimeout(t); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uq, uOpen, loc.id, ctx.user.company_id]);
+  async function fetchROs(term) {
+    // open outside ROs at this terminal; match on RO number or unit number
+    let q = sb.from('outside_ros')
+      .select('id,ro_number,unit_number,vendor_name,current_notes,date_sent,estimated_cost,final_cost,status,odometer')
+      .eq('location_id', loc.id).order('ro_number', { ascending: false }).limit(10);
+    if (ctx.user.company_id) q = q.eq('company_id', ctx.user.company_id);
+    if (term) q = q.or(`ro_number.ilike.%${term}%,unit_number.ilike.${term}%`);
+    const { data } = await q;
+    return data || [];
+  }
+
+  function resetSearch() { setSearchMode(null); }
 
   function fmtMiles(n) { return Number(n).toLocaleString(); }
 
@@ -81,31 +130,49 @@ export default function UnitsOutTab({ ctx }) {
 
   return (
     <div style={{ padding: 16 }}>
-      {/* unit file search */}
-      <div style={{ position: 'relative', marginBottom: 14, maxWidth: 360 }} ref={searchRef}>
-        <input
-          className="input"
-          placeholder="🔍 Open a unit file…"
-          value={uq}
-          onFocus={() => { setUOpen(true); loadUnits(uq.trim()); }}
-          onChange={e => { setUq(e.target.value); setUOpen(true); }}
-        />
-        {uOpen && (
-          <div className="card" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, maxHeight: 260, overflowY: 'auto' }}>
-            {uLoading && <div style={{ padding: '9px 12px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)' }}>Searching…</div>}
-            {!uLoading && uMatches.length === 0 && <div style={{ padding: '9px 12px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)' }}>No units at this terminal</div>}
-            {!uLoading && uMatches.map(u => (
-              <div
-                key={u.id}
-                onMouseDown={(e) => { e.preventDefault(); setUOpen(false); setUq(''); openUnit(u.id); }}
-                style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                <span>
-                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{u.unit_number}</span>
-                  <span style={{ color: 'var(--muted)', marginLeft: 8 }}>{[u.year, u.make, u.model].filter(Boolean).join(' ') || u.unit_type}</span>
-                </span>
-                {u.mileage != null && <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted2)', whiteSpace: 'nowrap' }}>{fmtMiles(u.mileage)} mi</span>}
-              </div>
-            ))}
+      {/* search control: button -> two buttons -> typeahead */}
+      <div style={{ marginBottom: 14, maxWidth: 420 }}>
+        {searchMode === null && (
+          <button className="btn btn-sm" onClick={() => setSearchMode('choose')}>🔍 Search</button>
+        )}
+        {searchMode === 'choose' && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)' }}>Search for:</span>
+            <button className="btn btn-sm btn-primary" onClick={() => setSearchMode('unit')}>Unit #</button>
+            <button className="btn btn-sm btn-primary" onClick={() => setSearchMode('ro')}>Repair Order</button>
+            <button className="btn btn-sm" onClick={resetSearch} style={{ marginLeft: 'auto' }}>✕</button>
+          </div>
+        )}
+        {searchMode === 'unit' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>Unit file</span>
+              <button className="btn btn-sm" onClick={resetSearch} style={{ marginLeft: 'auto' }}>✕</button>
+            </div>
+            <Typeahead
+              placeholder="Type unit number"
+              autoFocus
+              fetcher={fetchUnits}
+              display={(u) => `#${u.unit_number}`}
+              meta={(u) => [u.year, u.make, u.model].filter(Boolean).join(' ') || (u.mileage != null ? fmtMiles(u.mileage) + ' mi' : '—')}
+              onPick={(u) => { resetSearch(); openUnit(u.id); }}
+            />
+          </div>
+        )}
+        {searchMode === 'ro' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>Repair order</span>
+              <button className="btn btn-sm" onClick={resetSearch} style={{ marginLeft: 'auto' }}>✕</button>
+            </div>
+            <Typeahead
+              placeholder="Type RO number or unit number"
+              autoFocus
+              fetcher={fetchROs}
+              display={(r) => r.ro_number}
+              meta={(r) => `#${r.unit_number}${r.vendor_name ? ' · ' + r.vendor_name : ''}`}
+              onPick={(r) => { resetSearch(); openRO(r); }}
+            />
           </div>
         )}
       </div>
