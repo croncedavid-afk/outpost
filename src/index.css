@@ -135,12 +135,13 @@ body {
   position: relative;
   isolation: isolate;
 }
-:root[data-theme="dark"] .card::after {
+:root[data-theme="dark"] .card:not(.lh-bigtable)::after {
   content: '';
   position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
   background: linear-gradient(115deg, transparent 30%, rgba(220,255,235,0.16) 46%, rgba(220,255,235,0.05) 52%, transparent 60%);
 }
-:root[data-theme="dark"] .card > * { position: relative; z-index: 1; }
+/* keep the streak/stacking off the convoy overlay divs so they ride above on their own z-index (6-8) */
+:root[data-theme="dark"] .card > *:not(.lh-fx) { position: relative; z-index: 1; }
 :root[data-theme="dark"] body { background: var(--page-bg); color: var(--text); }
 :root[data-theme="dark"] .input,
 :root[data-theme="dark"] .select,
