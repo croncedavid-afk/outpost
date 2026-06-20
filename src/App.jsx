@@ -90,7 +90,7 @@ export default function App() {
     }
     function clearRows() { document.querySelectorAll('.lh-bigtable').forEach((card) => positionRow(card, null)); }
     function markCards() {
-      document.querySelectorAll('.card').forEach((c) => { if (!c.classList.contains('lh-bigtable')) c.classList.add('glow-fx'); });
+      document.querySelectorAll('.card').forEach((c) => { if (!c.classList.contains('lh-bigtable') && !c.classList.contains('glow-skip')) c.classList.add('glow-fx'); });
     }
 
     let cleanupFns = [];
@@ -100,7 +100,7 @@ export default function App() {
       function run() {
         markCards();
         const mid = window.innerHeight / 2;
-        const cards = Array.from(document.querySelectorAll('.card')).filter((c) => !c.classList.contains('lh-bigtable'));
+        const cards = Array.from(document.querySelectorAll('.card')).filter((c) => !c.classList.contains('lh-bigtable') && !c.classList.contains('glow-skip'));
         const cand = cards.map((c) => ({ c, b: c.getBoundingClientRect() }))
           .filter(({ b }) => b.height > 0 && b.bottom > 110 && b.top < window.innerHeight - 70);
 
@@ -161,7 +161,7 @@ export default function App() {
         const card = e.target.closest && e.target.closest('.card');
         const bigCard = card && card.classList.contains('lh-bigtable') ? card : (e.target.closest && e.target.closest('.lh-bigtable'));
         document.querySelectorAll('.card.glow-center').forEach((c) => { if (c !== card) c.classList.remove('glow-center'); });
-        if (card && !card.classList.contains('lh-bigtable')) card.classList.add('glow-center');
+        if (card && !card.classList.contains('lh-bigtable') && !card.classList.contains('glow-skip')) card.classList.add('glow-center');
         if (bigCard) { const row = e.target.closest && e.target.closest('tbody tr'); if (row && bigCard.contains(row)) positionRow(bigCard, row); }
       }
       function onLeaveDoc(e) {
