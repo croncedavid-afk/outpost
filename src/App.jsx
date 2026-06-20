@@ -6,6 +6,7 @@ import SendOutTab from './tabs/SendOutTab.jsx';
 import ApprovalsTab from './tabs/ApprovalsTab.jsx';
 import ROPage from './ROPage.jsx';
 import UnitTab from './UnitTab.jsx';
+import ThemeSettings, { initTheme } from './components/ThemeSettings.jsx';
 
 // ── Auth: shell handoff (read synchronously before first render) ──
 function readInitialUser() {
@@ -39,6 +40,7 @@ export default function App() {
   const [loginPw, setLoginPw] = useState('');
   const [loginErr, setLoginErr] = useState('');
   const [activeTab, setActiveTab] = useState('radar');
+  const [showTheme, setShowTheme] = useState(false);
   const [loc, setLoc] = useState(null);          // { id, code, name }
   const [serviceModel, setServiceModel] = useState(null); // 'vendor_based' | 'in_house_shop' | null
   const [locLoading, setLocLoading] = useState(true);
@@ -52,24 +54,79 @@ export default function App() {
   const openUnit = useCallback((unitId) => setOverlay({ type: 'unit', unitId }), []);
   const closeOverlay = useCallback(() => setOverlay(null), []);
 
-  // apply saved theme + accent
+  // apply saved theme + accent via the shared platform component (appKey 'op')
   useEffect(() => {
     if (!user?.id) return;
-    (async () => {
-      try {
-        const { data } = await sb.from('user_preferences')
-          .select('preference_key,preference_value').eq('user_id', user.id);
-        (data || []).forEach(row => {
-          if (row.preference_key === 'colors' && row.preference_value?.accent) {
-            document.documentElement.style.setProperty('--accent', row.preference_value.accent);
-          }
-          if (row.preference_key === 'theme' && row.preference_value?.mode) {
-            document.documentElement.setAttribute('data-theme', row.preference_value.mode);
-          }
-        });
-      } catch {}
-    })();
+    initTheme(sb, user.id, 'op');
   }, [user?.id]);
+
+  // ---- Focus FX: hover on desktop, screen-center on touch ----
+  // Cards (bubbles): lift + glow + two-chaser snake + 8% grow.
+  // (Outpost lists are div-row cards, so only the card-glow half of the
+  //  master system applies; there are no <table> rows for the truck convoy.)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isTouch = !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
+
+    function markCards() {
+      document.querySelectorAll('.card').forEach((c) => {
+        if (!c.classList.contains('lh-bigtable')) c.classList.add('glow-fx');
+      });
+    }
+
+    let cleanupFns = [];
+
+    if (isTouch) {
+      // TOUCH: the screen-centered card lights up as you scroll
+      function run() {
+        markCards();
+        const mid = window.innerHeight / 2;
+        const cards = Array.from(document.querySelectorAll('.card')).filter((c) => !c.classList.contains('lh-bigtable'));
+        let bc = null, bcd = Infinity;
+        for (const c of cards) {
+          const b = c.getBoundingClientRect();
+          const cc = b.top + b.height / 2;
+          const d = Math.abs(cc - mid);
+          if (cc > 110 && cc < window.innerHeight - 70 && d < bcd) { bcd = d; bc = c; }
+        }
+        cards.forEach((c) => c.classList.toggle('glow-center', c === bc));
+      }
+      let raf = 0;
+      const onScroll = () => { if (raf) return; raf = requestAnimationFrame(() => { run(); raf = 0; }); };
+      window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+      window.addEventListener('resize', onScroll);
+      const mo = new MutationObserver(onScroll); mo.observe(document.body, { childList: true, subtree: true });
+      const t1 = setTimeout(run, 60); const t2 = setTimeout(run, 300); run();
+      cleanupFns.push(() => {
+        window.removeEventListener('scroll', onScroll, { capture: true });
+        window.removeEventListener('resize', onScroll); mo.disconnect();
+        clearTimeout(t1); clearTimeout(t2);
+      });
+    } else {
+      // DESKTOP: the card under the mouse lights up
+      function onOver(e) {
+        markCards();
+        const card = e.target.closest && e.target.closest('.card');
+        document.querySelectorAll('.card.glow-center').forEach((c) => { if (c !== card) c.classList.remove('glow-center'); });
+        if (card && !card.classList.contains('lh-bigtable')) card.classList.add('glow-center');
+      }
+      function onLeaveDoc(e) {
+        const toEl = e.relatedTarget;
+        document.querySelectorAll('.card.glow-center').forEach((c) => { if (!toEl || !c.contains(toEl)) c.classList.remove('glow-center'); });
+      }
+      document.addEventListener('mouseover', onOver);
+      document.addEventListener('mouseout', onLeaveDoc);
+      const mo = new MutationObserver(() => markCards()); mo.observe(document.body, { childList: true, subtree: true });
+      const t1 = setTimeout(markCards, 60); markCards();
+      cleanupFns.push(() => {
+        document.removeEventListener('mouseover', onOver);
+        document.removeEventListener('mouseout', onLeaveDoc);
+        mo.disconnect(); clearTimeout(t1);
+      });
+    }
+
+    return () => { cleanupFns.forEach((fn) => fn()); };
+  }, [user?.id, activeTab, overlay]);  // re-bind when tab/overlay changes so new cards are covered
 
   // platform-owner / multi-location roles can pick any terminal
   const isOwnerLevel = ['business', 'superadmin', 'admin', 'vp', 'director', 'regional_manager'].includes(user?.role);
@@ -175,8 +232,9 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--page-bg)' }}>
+      {showTheme && <ThemeSettings sb={sb} user={user} appKey="op" onClose={() => setShowTheme(false)} />}
       {/* top bar */}
-      <div style={{ background: 'var(--nav-bg)', color: 'var(--nav-text)', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div id="op-nav" style={{ background: 'var(--nav-bg)', color: 'var(--nav-text)', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 18 }}>📡</span>
         <span style={{ fontWeight: 600, fontSize: 15 }}>Outpost</span>
         {loc && isOwnerLevel && pickList && pickList.length > 0 ? (
@@ -199,11 +257,12 @@ export default function App() {
             : <span className="badge" style={{ background: 'rgba(255,255,255,0.10)', color: '#bbb' }}>read-only · managed by shop</span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.7 }}>{user.name || user.email} · {(user.role || '').replace(/_/g, ' ')}</span>
-        <button className="btn btn-sm" onClick={logout} style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)' }}>Sign out</button>
+        <button className="sc-nav-btn" onClick={() => setShowTheme(true)} title="Theme & accent">🎨 theme</button>
+        <button className="sc-nav-btn" onClick={logout}>sign out</button>
       </div>
 
       {/* tab bar */}
-      <div style={{ background: 'var(--white)', borderBottom: '1px solid var(--border)', padding: '0 12px', display: 'flex', gap: 2, overflowX: 'auto' }}>
+      <div id="op-tabs" style={{ background: 'var(--white)', borderBottom: '1px solid var(--border)', padding: '0 12px', display: 'flex', gap: 2, overflowX: 'auto' }}>
         {TABS.map(t => {
           // hide Send Out + Approvals when read-only (managed-by-shop terminals)
           if (!fullAccess && (t.id === 'send_out' || t.id === 'approvals')) return null;
