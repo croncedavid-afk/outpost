@@ -135,7 +135,7 @@ body {
   position: relative;
   isolation: isolate;
 }
-:root[data-theme="dark"] .card:not(.lh-bigtable)::after {
+:root[data-theme="dark"] .card:not(.lh-bigtable):not(.glow-skip)::after {
   content: '';
   position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
   background: linear-gradient(115deg, transparent 30%, rgba(220,255,235,0.16) 46%, rgba(220,255,235,0.05) 52%, transparent 60%);
