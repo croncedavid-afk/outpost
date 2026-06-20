@@ -82,14 +82,41 @@ export default function App() {
         markCards();
         const mid = window.innerHeight / 2;
         const cards = Array.from(document.querySelectorAll('.card')).filter((c) => !c.classList.contains('lh-bigtable'));
-        let bc = null, bcd = Infinity;
-        for (const c of cards) {
-          const b = c.getBoundingClientRect();
-          const cc = b.top + b.height / 2;
-          const d = Math.abs(cc - mid);
-          if (cc > 110 && cc < window.innerHeight - 70 && d < bcd) { bcd = d; bc = c; }
+        // visible candidates (rect-based)
+        const cand = cards.map((c) => ({ c, b: c.getBoundingClientRect() }))
+          .filter(({ b }) => b.height > 0 && b.bottom > 110 && b.top < window.innerHeight - 70);
+
+        let chosen = null;
+        // cards the screen-center line passes through = the "current row"
+        const straddlers = cand.filter(({ b }) => b.top <= mid && b.bottom >= mid);
+        if (straddlers.length) {
+          // anchor = straddler whose center is nearest the mid line
+          straddlers.sort((p, q) =>
+            Math.abs((p.b.top + p.b.height / 2) - mid) - Math.abs((q.b.top + q.b.height / 2) - mid));
+          const anchor = straddlers[0];
+          // group the straddlers that share the anchor's row (strong vertical overlap)
+          const row = straddlers.filter(({ b }) => {
+            const overlap = Math.min(b.bottom, anchor.b.bottom) - Math.max(b.top, anchor.b.top);
+            return overlap > Math.min(b.height, anchor.b.height) * 0.5;
+          });
+          row.sort((p, q) => p.b.left - q.b.left); // left -> right
+          // how far down the row's height the center line sits: 0 = top, 1 = bottom
+          const top = Math.min(...row.map((r) => r.b.top));
+          const bot = Math.max(...row.map((r) => r.b.bottom));
+          let frac = (mid - top) / Math.max(1, bot - top);
+          frac = Math.max(0, Math.min(0.999, frac));
+          // left lights first; crossing halfway hands off to the next column (generalizes to 3+ across)
+          const idx = Math.min(row.length - 1, Math.floor(frac * row.length));
+          chosen = row[idx].c;
+        } else if (cand.length) {
+          // between rows: fall back to nearest-center so the glow never drops out
+          let bcd = Infinity;
+          for (const { c, b } of cand) {
+            const d = Math.abs((b.top + b.height / 2) - mid);
+            if (d < bcd) { bcd = d; chosen = c; }
+          }
         }
-        cards.forEach((c) => c.classList.toggle('glow-center', c === bc));
+        cards.forEach((c) => c.classList.toggle('glow-center', c === chosen));
       }
       let raf = 0;
       const onScroll = () => { if (raf) return; raf = requestAnimationFrame(() => { run(); raf = 0; }); };
