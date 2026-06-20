@@ -246,7 +246,7 @@ export default function RadarTab({ ctx }) {
   if (loading) return <div className="loading">Loading radar…</div>;
 
   const Metric = ({ label, value, sub, color }) => (
-    <div className="card" style={{ background: 'var(--surface2)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+    <div className="card" style={{ borderRadius: 'var(--radius-md)', padding: 12 }}>
       <div style={{ fontSize: 11, color: 'var(--muted)' }}>{label}</div>
       <div style={{ fontSize: 21, fontWeight: 600, color: color || 'var(--text)' }}>{value}</div>
       {sub && <div style={{ fontSize: 10, color: 'var(--muted2)', marginTop: 2 }}>{sub}</div>}
@@ -274,23 +274,32 @@ export default function RadarTab({ ctx }) {
       {dueList.length === 0 ? (
         <div className="card" style={{ padding: 24, fontSize: 13, color: 'var(--muted)' }}>Nothing due right now — the fleet is current.</div>
       ) : (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          {dueList.map((u, idx) => {
-            const od = u.pm.status === 'overdue';
-            const detail = od
-              ? `${u.pm.daysOverdue || 0}d overdue${u.mileage ? ' · ' + u.mileage.toLocaleString() + ' mi' : ''}`
-              : `due in ${u.pm.daysToDue || 0}d${u.mileage ? ' · ' + u.mileage.toLocaleString() + ' mi' : ''}`;
-            return (
-              <div key={u.id} style={{ padding: '12px 14px', borderTop: idx ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: od ? 'var(--accent)' : 'var(--amber)', flexShrink: 0 }} />
-                <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, fontSize: 14, minWidth: 64 }}>{u.unit_number}</span>
-                <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1 }}>{detail}</span>
-                {fullAccess && (
-                  <button className="btn btn-sm" onClick={() => setActiveTab('send_out')}>Send out</button>
-                )}
-              </div>
-            );
-          })}
+        <div className="card lh-bigtable" style={{ overflow: 'hidden', position: 'relative' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {dueList.map((u, idx) => {
+                const od = u.pm.status === 'overdue';
+                const detail = od
+                  ? `${u.pm.daysOverdue || 0}d overdue${u.mileage ? ' · ' + u.mileage.toLocaleString() + ' mi' : ''}`
+                  : `due in ${u.pm.daysToDue || 0}d${u.mileage ? ' · ' + u.mileage.toLocaleString() + ' mi' : ''}`;
+                const td = { padding: '12px 14px', borderTop: idx ? '1px solid var(--border)' : 'none', verticalAlign: 'middle' };
+                return (
+                  <tr key={u.id}>
+                    <td style={{ ...td, width: 1, paddingRight: 0 }}>
+                      <span style={{ display: 'block', width: 9, height: 9, borderRadius: '50%', background: od ? 'var(--accent)' : 'var(--amber)' }} />
+                    </td>
+                    <td style={{ ...td, fontFamily: 'var(--mono)', fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>{u.unit_number}</td>
+                    <td style={{ ...td, fontSize: 12, color: 'var(--muted)', width: '100%' }}>{detail}</td>
+                    {fullAccess && (
+                      <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button className="btn btn-sm" onClick={() => setActiveTab('send_out')}>Send out</button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
