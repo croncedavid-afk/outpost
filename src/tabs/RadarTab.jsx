@@ -160,7 +160,7 @@ function ForecastPanel({ ctx, overdue, dueSoon }) {
   if (!selected.length) return null;
 
   return (
-    <div className="card" style={{ border: '1px solid var(--blue)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 18 }}>
+    <div className="card lh-bigtable" style={{ border: '1px solid var(--blue)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 18, position: 'relative' }}>
       <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>✨</span>
@@ -178,10 +178,12 @@ function ForecastPanel({ ctx, overdue, dueSoon }) {
       {!busy && !forecast.length && !note && (
         <div style={{ padding: 16, fontSize: 13, color: 'var(--muted)' }}>Tap <b>Forecast PM needs</b> to predict likely service for these units.{moreThanCap && ' Showing the 15 most urgent (overdue first).'}</div>
       )}
-      {!busy && forecast.length > 0 && selected.map((u) => {
+      {!busy && forecast.length > 0 && (
+        <div style={{ padding: 10 }}>
+        {selected.map((u) => {
         const f = byUnit[u.unit_number]; const od = u.pm?.status === 'overdue';
         return (
-          <div key={u.id} style={{ padding: '11px 14px', borderTop: '1px solid var(--border)' }}>
+          <div key={u.id} className="card glow-fx" style={{ padding: '12px 14px', marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: f && f.items && f.items.length ? 6 : 0 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: od ? 'var(--accent)' : 'var(--amber)' }} />
               <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, fontSize: 13 }}>{u.unit_number}</span>
@@ -198,6 +200,8 @@ function ForecastPanel({ ctx, overdue, dueSoon }) {
           </div>
         );
       })}
+        </div>
+      )}
     </div>
   );
 }
