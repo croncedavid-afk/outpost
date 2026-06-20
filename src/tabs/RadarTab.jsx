@@ -246,7 +246,7 @@ export default function RadarTab({ ctx }) {
   if (loading) return <div className="loading">Loading radar…</div>;
 
   const Metric = ({ label, value, sub, color }) => (
-    <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+    <div className="card" style={{ background: 'var(--surface2)', borderRadius: 'var(--radius-md)', padding: 12 }}>
       <div style={{ fontSize: 11, color: 'var(--muted)' }}>{label}</div>
       <div style={{ fontSize: 21, fontWeight: 600, color: color || 'var(--text)' }}>{value}</div>
       {sub && <div style={{ fontSize: 10, color: 'var(--muted2)', marginTop: 2 }}>{sub}</div>}
