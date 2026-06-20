@@ -103,12 +103,13 @@ export default function ApprovalsTab({ ctx }) {
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: 'var(--page-bg)' }}>
       <div style={S.wrap}>
-        <div style={S.card}>
+        <div className="card lh-bigtable" style={{ ...S.card, position: 'relative' }}>
           <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ ...S.mono, fontSize: 12, fontWeight: 700 }}>🔏 Pending approvals</span>
             <span style={{ ...S.mono, fontSize: 11, color: 'var(--muted2)' }}>({visible.length})</span>
           </div>
           {!visible.length && <div style={{ ...S.mono, fontSize: 11, color: 'var(--muted2)', padding: 16 }}>No jobs waiting for approval.</div>}
+          {visible.length > 0 && <div style={{ padding: 10 }}>
           {visible.map(({ job, ro }) => {
             const approver = resolveApprover(chains, ro.location_id);
             const canAct = userIsApprover(user, approver);
@@ -116,7 +117,7 @@ export default function ApprovalsTab({ ctx }) {
               : approver.approver_type === 'role' ? approver.approver_role
               : (approver.approver_user_name || 'specific user');
             return (
-              <div key={job.id} style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+              <div key={job.id} className="card glow-fx" style={{ padding: '12px 14px', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <span onClick={() => openRO && openRO(ro)} style={{ ...S.mono, fontSize: 14, fontWeight: 700, cursor: openRO ? 'pointer' : 'default', textDecoration: openRO ? 'underline' : 'none' }}>#{ro.unit_number}</span>
                   <span style={{ ...S.mono, fontSize: 11, color: 'var(--muted2)' }}>{ro.ro_number} · J{job.job_number} · {locations.find(l => l.id === ro.location_id)?.name || ro.location_id}</span>
@@ -137,6 +138,7 @@ export default function ApprovalsTab({ ctx }) {
               </div>
             );
           })}
+          </div>}
         </div>
 
         {isSuperAdmin && <ChainConfig user={user} chains={chains} locations={locations} users={users} reload={load} />}
