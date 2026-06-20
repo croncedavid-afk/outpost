@@ -160,7 +160,7 @@ function ForecastPanel({ ctx, overdue, dueSoon }) {
   if (!selected.length) return null;
 
   return (
-    <div className="card lh-bigtable" style={{ border: '1px solid var(--blue)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 18, position: 'relative' }}>
+    <div className="card glow-skip" style={{ border: '1px solid var(--blue)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 18, position: 'relative' }}>
       <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>✨</span>
