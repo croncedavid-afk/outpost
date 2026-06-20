@@ -123,3 +123,120 @@ body {
   button { touch-action: manipulation; }
   table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 }
+
+/* ============================================================================
+   DESIGN SYSTEM PASS (June 2026) — applied from DESIGN-SYSTEM_MASTER
+   Adds: ambient wash + nav chrome (A4), green-glow nav buttons (A6),
+   acronym highlight-&-lift tooltip (A8), scroll/hover focus card glow (Part C).
+   Outpost keeps IBM Plex (its existing standard) and its Ember accent2 fallback.
+   ============================================================================ */
+
+/* ---- A4: ambient corner wash behind everything ---- */
+body::before{
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(900px 480px at 88% -14%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 64%),
+    radial-gradient(780px 460px at -8% 112%, rgba(55,138,221,.05), transparent 64%);
+}
+:root[data-theme='dark'] body::before{
+  background:
+    radial-gradient(900px 480px at 88% -14%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 64%),
+    radial-gradient(780px 460px at -8% 112%, rgba(72,120,255,.08), transparent 64%);
+}
+/* keep app chrome above the wash */
+#op-nav, #op-tabs { position: relative; z-index: 2; }
+
+/* ---- A4: nav chrome ---- */
+#op-nav{ box-shadow:0 6px 18px rgba(0,0,0,.14), inset 0 -1px 0 rgba(255,255,255,.08); }
+:root[data-theme='dark'] #op-nav{ box-shadow:0 8px 22px rgba(0,0,0,.45), inset 0 -1px 0 rgba(120,255,180,.18); }
+:root[data-theme='dark'] #op-tabs{ box-shadow: inset 0 -1px 0 rgba(120,255,180,.10); }
+
+/* ---- A4: dark-mode input contrast (platform standard) ---- */
+:root[data-theme='dark'] .input, :root[data-theme='dark'] select, :root[data-theme='dark'] textarea,
+:root[data-theme='dark'] input[type='text'], :root[data-theme='dark'] input[type='number'],
+:root[data-theme='dark'] input[type='email'], :root[data-theme='dark'] input[type='password'],
+:root[data-theme='dark'] input[type='date'], :root[data-theme='dark'] input[type='time']{
+  background:#272c34; border-color:rgba(255,255,255,.16); color:var(--text);
+}
+:root[data-theme='dark'] .input:focus, :root[data-theme='dark'] select:focus, :root[data-theme='dark'] textarea:focus{
+  background:#2c323b; border-color:var(--accent2);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ---- Sunlight / high-contrast: strip the heavy effects, keep it readable ---- */
+:root[data-contrast='high'] body::before{ display:none; }
+
+/* ---- A6: prominent nav buttons — green border + glow ---- */
+.sc-nav-btn{
+  font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .03em;
+  color: #3cff8c; background: rgba(60,255,140,.06); border: 1.5px solid rgba(60,255,140,.45);
+  border-radius: 9px; padding: 6px 12px; cursor: pointer; white-space: nowrap; line-height: 1;
+  box-shadow: 0 0 8px rgba(60,255,140,.25), inset 0 0 5px rgba(60,255,140,.10);
+  transition: transform .12s ease, background .15s ease, box-shadow .15s ease;
+}
+.sc-nav-btn:hover{ background: rgba(60,255,140,.14); box-shadow: 0 0 16px rgba(60,255,140,.5), inset 0 0 7px rgba(60,255,140,.18); transform: translateY(-1px); }
+.sc-nav-btn:active{ transform: translateY(0) scale(.97); }
+:root:not([data-theme='dark']) .sc-nav-btn{
+  color: var(--accent); background: var(--red-dim);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+:root:not([data-theme='dark']) .sc-nav-btn:hover{ background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent); }
+
+/* ---- A8: acronym "highlight & lift" tooltip ---- */
+.term{ position: relative; border-bottom: 1px dotted var(--muted2); cursor: help; }
+.term > .term-tip{
+  position: absolute; left: 0; bottom: 135%; opacity: 0; transform: translateY(-3px);
+  transition: opacity .14s ease, transform .14s ease;
+  background: var(--white); border: 1px solid var(--border2); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md); padding: 7px 9px;
+  font-family: var(--sans); font-size: 11.5px; font-weight: 400; color: var(--text);
+  text-transform: none; max-width: 240px; white-space: normal; z-index: 60; pointer-events: none;
+}
+.term.term-right > .term-tip{ left: auto; right: 0; }
+.term:hover > .term-tip{ opacity: 1; transform: translateY(0); }
+
+/* ============================================================================
+   PART C — FOCUS EFFECTS: CARD GLOW (cards/bubbles)
+   Controller in App.jsx adds .glow-fx to every non-table .card and toggles
+   .glow-center on the hovered (desktop) / screen-centered (touch) card.
+   (Outpost's lists are div-row cards, so only the card-glow half is used;
+   the big-table truck convoy is not applicable here.)
+   ============================================================================ */
+.card.glow-fx{ position: relative; isolation: isolate; }
+.card.glow-fx > *{ position: relative; z-index: 2; }
+.card.glow-fx::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; z-index:1;
+  padding:1.6px; opacity:0; transition:opacity .25s ease; pointer-events:none;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+}
+.card.glow-center{
+  transform: translateY(-3px) scale(1.022);
+  border-color: transparent;
+  box-shadow: 0 14px 34px rgba(0,0,0,.5), 0 0 22px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+:root:not([data-theme='dark']) .card.glow-center{
+  box-shadow: var(--shadow-lg), 0 0 22px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.card.glow-center::before{
+  opacity:1;
+  background: conic-gradient(from var(--lh-ang,0deg),
+    transparent 0deg, var(--accent) 22deg, transparent 60deg,
+    transparent 180deg, var(--accent2) 202deg, transparent 240deg, transparent 360deg);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 50%, transparent));
+  animation: lhSnake 4s linear infinite;
+}
+@media (hover:hover){
+  .card.glow-fx:hover{ transform: translateY(-3px) scale(1.08); }
+  .card.glow-center:hover{ transform: translateY(-4px) scale(1.08); }
+}
+@property --lh-ang{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
+@keyframes lhSnake{ to{ --lh-ang:360deg; } }
+@supports not (background: conic-gradient(from var(--lh-ang), red, blue)){
+  .card.glow-center::before{ animation: lhSnakeRot 4s linear infinite; }
+  @keyframes lhSnakeRot{ to{ transform: rotate(360deg); } }
+}
+/* sunlight/high-contrast: no glow, keep a solid accent outline so focus is still legible */
+:root[data-contrast='high'] .card.glow-center{ transform:none; box-shadow:none; border-color:var(--accent); }
+:root[data-contrast='high'] .card.glow-center::before{ display:none; }
