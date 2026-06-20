@@ -62,27 +62,45 @@ export default function App() {
 
   // ---- Focus FX: hover on desktop, screen-center on touch ----
   // Cards (bubbles): lift + glow + two-chaser snake + 8% grow.
-  // (Outpost lists are div-row cards, so only the card-glow half of the
-  //  master system applies; there are no <table> rows for the truck convoy.)
+  // Big tables (.lh-bigtable): rail + truck convoy + dust trail on the active row.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const TILE = 24;
     const isTouch = !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
 
+    function ensureOverlays(card) {
+      if (card.__lhFx) return card.__lhFx;
+      const mk = (cls) => { const d = document.createElement('div'); d.className = 'lh-fx ' + cls; card.appendChild(d); return d; };
+      const fx = { rail: mk('lh-fx-rail'), dust: mk('lh-fx-dust'), convoy: mk('lh-fx-convoy') };
+      card.__lhFx = fx; return fx;
+    }
+    function positionRow(card, row) {
+      const fx = ensureOverlays(card);
+      const rows = card.querySelectorAll('tbody tr');
+      rows.forEach((r) => r.classList.toggle('lh-row-center', r === row));
+      if (row) {
+        const cb = card.getBoundingClientRect(); const rb = row.getBoundingClientRect();
+        const top = rb.top - cb.top + card.scrollTop; const h = rb.height; const y = (top + h - TILE) + 'px';
+        fx.rail.style.top = top + 'px'; fx.rail.style.height = h + 'px'; fx.rail.classList.add('show');
+        fx.convoy.style.top = y; fx.convoy.classList.add('show');
+        fx.dust.style.top = y; fx.dust.classList.add('show');
+      } else {
+        fx.rail.classList.remove('show'); fx.convoy.classList.remove('show'); fx.dust.classList.remove('show');
+      }
+    }
+    function clearRows() { document.querySelectorAll('.lh-bigtable').forEach((card) => positionRow(card, null)); }
     function markCards() {
-      document.querySelectorAll('.card').forEach((c) => {
-        if (!c.classList.contains('lh-bigtable')) c.classList.add('glow-fx');
-      });
+      document.querySelectorAll('.card').forEach((c) => { if (!c.classList.contains('lh-bigtable')) c.classList.add('glow-fx'); });
     }
 
     let cleanupFns = [];
 
     if (isTouch) {
-      // TOUCH: the screen-centered card lights up as you scroll
+      // ---------- TOUCH: screen-center target ----------
       function run() {
         markCards();
         const mid = window.innerHeight / 2;
         const cards = Array.from(document.querySelectorAll('.card')).filter((c) => !c.classList.contains('lh-bigtable'));
-        // visible candidates (rect-based)
         const cand = cards.map((c) => ({ c, b: c.getBoundingClientRect() }))
           .filter(({ b }) => b.height > 0 && b.bottom > 110 && b.top < window.innerHeight - 70);
 
@@ -90,26 +108,22 @@ export default function App() {
         // cards the screen-center line passes through = the "current row"
         const straddlers = cand.filter(({ b }) => b.top <= mid && b.bottom >= mid);
         if (straddlers.length) {
-          // anchor = straddler whose center is nearest the mid line
           straddlers.sort((p, q) =>
             Math.abs((p.b.top + p.b.height / 2) - mid) - Math.abs((q.b.top + q.b.height / 2) - mid));
           const anchor = straddlers[0];
-          // group the straddlers that share the anchor's row (strong vertical overlap)
-          const row = straddlers.filter(({ b }) => {
+          // side-by-side tiles sharing the anchor's row: left lights first, hands off to right past halfway
+          const rowCards = straddlers.filter(({ b }) => {
             const overlap = Math.min(b.bottom, anchor.b.bottom) - Math.max(b.top, anchor.b.top);
             return overlap > Math.min(b.height, anchor.b.height) * 0.5;
           });
-          row.sort((p, q) => p.b.left - q.b.left); // left -> right
-          // how far down the row's height the center line sits: 0 = top, 1 = bottom
-          const top = Math.min(...row.map((r) => r.b.top));
-          const bot = Math.max(...row.map((r) => r.b.bottom));
+          rowCards.sort((p, q) => p.b.left - q.b.left);
+          const top = Math.min(...rowCards.map((r) => r.b.top));
+          const bot = Math.max(...rowCards.map((r) => r.b.bottom));
           let frac = (mid - top) / Math.max(1, bot - top);
           frac = Math.max(0, Math.min(0.999, frac));
-          // left lights first; crossing halfway hands off to the next column (generalizes to 3+ across)
-          const idx = Math.min(row.length - 1, Math.floor(frac * row.length));
-          chosen = row[idx].c;
+          const idx = Math.min(rowCards.length - 1, Math.floor(frac * rowCards.length));
+          chosen = rowCards[idx].c;
         } else if (cand.length) {
-          // between rows: fall back to nearest-center so the glow never drops out
           let bcd = Infinity;
           for (const { c, b } of cand) {
             const d = Math.abs((b.top + b.height / 2) - mid);
@@ -117,6 +131,17 @@ export default function App() {
           }
         }
         cards.forEach((c) => c.classList.toggle('glow-center', c === chosen));
+
+        // big tables: roll the convoy onto the screen-centered row
+        document.querySelectorAll('.lh-bigtable').forEach((card) => {
+          const rows = card.querySelectorAll('tbody tr');
+          let br = null, brd = Infinity;
+          rows.forEach((r) => {
+            const b = r.getBoundingClientRect(); const cc = b.top + b.height / 2; const d = Math.abs(cc - mid);
+            if (cc > 110 && cc < window.innerHeight - 70 && d < brd) { brd = d; br = r; }
+          });
+          positionRow(card, br);
+        });
       }
       let raf = 0;
       const onScroll = () => { if (raf) return; raf = requestAnimationFrame(() => { run(); raf = 0; }); };
@@ -130,21 +155,24 @@ export default function App() {
         clearTimeout(t1); clearTimeout(t2);
       });
     } else {
-      // DESKTOP: the card under the mouse lights up
+      // ---------- DESKTOP: the mouse is the target (hover) ----------
       function onOver(e) {
         markCards();
         const card = e.target.closest && e.target.closest('.card');
+        const bigCard = card && card.classList.contains('lh-bigtable') ? card : (e.target.closest && e.target.closest('.lh-bigtable'));
         document.querySelectorAll('.card.glow-center').forEach((c) => { if (c !== card) c.classList.remove('glow-center'); });
         if (card && !card.classList.contains('lh-bigtable')) card.classList.add('glow-center');
+        if (bigCard) { const row = e.target.closest && e.target.closest('tbody tr'); if (row && bigCard.contains(row)) positionRow(bigCard, row); }
       }
       function onLeaveDoc(e) {
         const toEl = e.relatedTarget;
         document.querySelectorAll('.card.glow-center').forEach((c) => { if (!toEl || !c.contains(toEl)) c.classList.remove('glow-center'); });
+        document.querySelectorAll('.lh-bigtable').forEach((card) => { if (!toEl || !card.contains(toEl)) positionRow(card, null); });
       }
       document.addEventListener('mouseover', onOver);
       document.addEventListener('mouseout', onLeaveDoc);
       const mo = new MutationObserver(() => markCards()); mo.observe(document.body, { childList: true, subtree: true });
-      const t1 = setTimeout(markCards, 60); markCards();
+      const t1 = setTimeout(markCards, 60); markCards(); clearRows();
       cleanupFns.push(() => {
         document.removeEventListener('mouseover', onOver);
         document.removeEventListener('mouseout', onLeaveDoc);
