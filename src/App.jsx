@@ -241,9 +241,17 @@ export default function App() {
       setUser(data);
     } catch (e) { setLoginErr('Login failed: ' + String(e?.message || e)); }
   }
-  function logout() {
+  async function logout() {
     sessionStorage.removeItem('al_session_user');
-    setUser(null);
+    let dest = 'https://al-shell-git-main-fleet-solutions-platform.vercel.app/';
+    try {
+      const cid = user && user.company_id;
+      if (cid) {
+        const r = await sb.from('companies').select('slug').eq('id', cid).maybeSingle();
+        if (r && r.data && r.data.slug) dest = 'https://al-shell-git-main-fleet-solutions-platform.vercel.app/c/' + r.data.slug;
+      }
+    } catch {}
+    window.location.href = dest;
   }
 
   // ── Login screen (direct access only) ──
