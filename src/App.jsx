@@ -50,6 +50,17 @@ export default function App() {
   // full-page overlay: open an outside RO or a unit file over the tabs (Back returns)
   // shape: { type: 'ro', ro } | { type: 'unit', unitId }
   const [overlay, setOverlay] = useState(null);
+  // Issue a terminal-expense PO: deep-link to FleetStock's PO page in spend mode
+  // (no inventory; posts to the terminal GL). Carries the shell_user handoff so
+  // there's no second login, and the active terminal so the PO lands on it.
+  const FLEETSTOCK_URL = 'https://fleetstock-git-main-fleet-solutions-platform.vercel.app';
+  const issueTerminalPO = useCallback(() => {
+    try {
+      const su = '&shell_user=' + btoa(JSON.stringify(user));
+      const lp = loc?.id ? '&loc=' + encodeURIComponent(loc.id) : '';
+      window.open(FLEETSTOCK_URL + '/?po=new&mode=spend&origin=outpost' + lp + su, '_blank');
+    } catch { window.open(FLEETSTOCK_URL + '/?po=new&mode=spend&origin=outpost', '_blank'); }
+  }, [user, loc]);
   const openRO = useCallback((ro) => setOverlay({ type: 'ro', ro }), []);
   const openUnit = useCallback((unitId) => setOverlay({ type: 'unit', unitId }), []);
   const closeOverlay = useCallback(() => setOverlay(null), []);
@@ -291,7 +302,7 @@ export default function App() {
   const fullAccess = serviceModel === 'vendor_based';
   const readOnly = !fullAccess;
   const canApprove = APPROVER_ROLES.includes(user.role);
-  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab, openRO, openUnit, readOnly, canApprove };
+  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab, openRO, openUnit, readOnly, canApprove, issueTerminalPO };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--page-bg)' }}>
@@ -320,6 +331,7 @@ export default function App() {
             : <span className="badge" style={{ background: 'rgba(255,255,255,0.10)', color: '#bbb' }}>read-only · managed by shop</span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.7 }}>{user.name || user.email} · {(user.role || '').replace(/_/g, ' ')}</span>
+        <button className="sc-nav-btn" onClick={issueTerminalPO} title="Issue a terminal expense PO">+ Terminal PO</button>
         <button className="sc-nav-btn" onClick={() => setShowTheme(true)} title="Theme & accent">🎨 theme</button>
         <button className="sc-nav-btn" onClick={logout}>sign out</button>
       </div>
