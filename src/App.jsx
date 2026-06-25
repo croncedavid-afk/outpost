@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import TerminalPOTab from './tabs/TerminalPOTab.jsx';
 import { sb } from './supabase.js';
 import RadarTab from './tabs/RadarTab.jsx';
 import UnitsOutTab from './tabs/UnitsOutTab.jsx';
@@ -30,6 +31,7 @@ const APPROVER_ROLES = ['manager', 'terminal_manager', 'director', 'vp', 'admin'
 const TABS = [
   { id: 'radar', label: 'Radar', icon: 'M' },
   { id: 'units_out', label: 'Units Out', icon: 'U' },
+  { id: 'terminal_pos', label: 'Terminal POs', icon: 'P' },
   { id: 'send_out', label: 'Send Out', icon: 'S' },
   { id: 'approvals', label: 'Approvals', icon: 'A' },
 ];
@@ -331,7 +333,6 @@ export default function App() {
             : <span className="badge" style={{ background: 'rgba(255,255,255,0.10)', color: '#bbb' }}>read-only · managed by shop</span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.7 }}>{user.name || user.email} · {(user.role || '').replace(/_/g, ' ')}</span>
-        <button className="sc-nav-btn" onClick={issueTerminalPO} title="Issue a terminal expense PO">+ Terminal PO</button>
         <button className="sc-nav-btn" onClick={() => setShowTheme(true)} title="Theme & accent">🎨 theme</button>
         <button className="sc-nav-btn" onClick={logout}>sign out</button>
       </div>
@@ -393,6 +394,7 @@ export default function App() {
           <>
             {activeTab === 'radar' && <RadarTab ctx={ctx} />}
             {activeTab === 'units_out' && <UnitsOutTab ctx={ctx} />}
+            {activeTab === 'terminal_pos' && <TerminalPOTab ctx={ctx} />}
             {activeTab === 'send_out' && fullAccess && <SendOutTab ctx={ctx} />}
             {activeTab === 'approvals' && fullAccess && canApprove && <ApprovalsTab ctx={ctx} />}
           </>
