@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { sb as _sbReal } from './supabase.js';
 import { JOB_STATUS } from './shared.js';
+import OutsideUpdates from './OutsideUpdates.jsx';
 
 // ── READ-ONLY WRITE INTERCEPTOR ──────────────────────────────────────────────
 // Outpost renders this page in view-only mode for terminals that have a shop.
@@ -3077,6 +3078,15 @@ export default function ROPage({ ro, onBack, user, isTech, kind, readOnly = fals
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {isOutside && (
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>
+                Status updates
+              </div>
+              <OutsideUpdates roId={ro.id} roNumber={roData.ro_number} user={user} companyId={user?.company_id} canPost={!readOnly} />
             </div>
           )}
 
