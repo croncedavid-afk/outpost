@@ -313,7 +313,7 @@ export default function App() {
   const fullAccess = serviceModel === 'vendor_based';
   const readOnly = !fullAccess;
   const canApprove = APPROVER_ROLES.includes(user.role);
-  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab, openRO, openUnit, readOnly, canApprove, issueTerminalPO };
+  const ctx = { user, loc, serviceModel, fullAccess, isOwnerLevel, setActiveTab, openRO, openUnit, readOnly, canApprove, issueTerminalPO, roOverlayOpen: !!overlay };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--page-bg)' }}>
