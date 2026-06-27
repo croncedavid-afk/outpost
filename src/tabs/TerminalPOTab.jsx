@@ -109,11 +109,12 @@ export default function TerminalPOTab({ ctx }) {
   }
 
   function openPO(id) {
-    // open an existing spend PO in FleetStock (carries login + spend mode)
+    // open an existing spend PO in FleetStock IN-APP (same window) so the PWA
+    // isn't kicked out to a browser tab. Carries login + spend mode.
     try {
       const su = '&shell_user=' + btoa(JSON.stringify(user));
       const lp = locId ? '&loc=' + encodeURIComponent(locId) : '';
-      window.open('https://fleetstock-git-main-fleet-solutions-platform.vercel.app/?po=' + encodeURIComponent(id) + '&mode=spend&origin=outpost' + lp + su, '_blank');
+      window.location.href = 'https://fleetstock-git-main-fleet-solutions-platform.vercel.app/?po=' + encodeURIComponent(id) + '&mode=spend&origin=outpost' + lp + su;
     } catch { /* noop */ }
   }
 
