@@ -21,6 +21,41 @@ function fmtUpdate(ts) {
   return `${days}d ago · ${date}`;
 }
 
+// Last-update cell: a highlighted pill (accent-tinted) when a status note exists,
+// with a hover tooltip showing the latest note. Muted dash when there's none.
+function LastUpdateCell({ ts, note }) {
+  const [hover, setHover] = useState(false);
+  if (!ts) {
+    return <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted2)' }}>—</span>;
+  }
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <span style={{
+        fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, color: 'var(--accent)',
+        background: 'var(--red-dim)', border: '1px solid var(--border2)',
+        padding: '3px 8px', borderRadius: 10, whiteSpace: 'nowrap', cursor: 'default',
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+      }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+        {fmtUpdate(ts)}
+      </span>
+      {hover && note && (
+        <span onClick={(e) => e.stopPropagation()} style={{
+          position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, zIndex: 60,
+          width: 240, maxWidth: '60vw', background: 'var(--nav-bg, #0a0a0a)', color: 'var(--nav-text, #fff)',
+          padding: '9px 11px', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,.28)',
+          fontFamily: 'var(--sans)', fontSize: 11.5, lineHeight: 1.45, whiteSpace: 'pre-wrap', fontWeight: 400,
+          letterSpacing: 0, textTransform: 'none', pointerEvents: 'none',
+        }}>
+          <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 9, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Latest update</span>
+          {note}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // Shop-Command-style typeahead (unchanged) — first results on focus, narrows as you type.
 function Typeahead({ placeholder, fetcher, display, meta, onPick, autoFocus }) {
   const [value, setValue] = useState('');
@@ -256,7 +291,7 @@ export default function UnitsOutTab({ ctx }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* column header row (sortable) */}
-          <div className="glow-skip" style={{ display: 'grid', gridTemplateColumns: '110px 1fr 92px 116px 90px 22px', gap: 10, alignItems: 'center', padding: '0 14px' }}>
+          <div className="glow-skip" style={{ display: 'grid', gridTemplateColumns: '120px minmax(140px, 1fr) 110px 160px 104px 24px', gap: 18, alignItems: 'center', padding: '0 16px' }}>
             <Hdr k="unit">Unit / RO</Hdr>
             <Hdr k="notes">Job / notes</Hdr>
             <Hdr k="cost" style={{ textAlign: 'right' }}>Cost</Hdr>
@@ -286,7 +321,7 @@ export default function UnitsOutTab({ ctx }) {
                   <div
                     key={r.id}
                     onClick={() => openRO(r)}
-                    style={{ display: 'grid', gridTemplateColumns: '110px 1fr 92px 116px 90px 22px', gap: 10, alignItems: 'center', padding: '11px 14px', borderTop: idx ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
+                    style={{ display: 'grid', gridTemplateColumns: '120px minmax(140px, 1fr) 110px 160px 104px 24px', gap: 18, alignItems: 'center', padding: '13px 16px', borderTop: idx ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface2, rgba(0,0,0,0.02))'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                     {/* unit / ro */}
@@ -303,9 +338,7 @@ export default function UnitsOutTab({ ctx }) {
                       {cost ? '$' + Math.round(cost).toLocaleString() : '—'}
                     </span>
                     {/* last update */}
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: r._lastUpdate ? 'var(--text)' : 'var(--muted2)' }} title={r._lastNote || ''}>
-                      {fmtUpdate(r._lastUpdate)}
-                    </span>
+                    <LastUpdateCell ts={r._lastUpdate} note={r._lastNote} />
                     {/* time out */}
                     <span className={'badge ' + cls} style={{ justifySelf: 'start' }}>{dw.label}</span>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--muted2)', justifySelf: 'end' }}>›</span>
