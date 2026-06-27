@@ -24,7 +24,7 @@ function fmtDate(s) { if (!s) return '—'; try { return new Date(String(s).slic
 export default function TerminalPOTab({ ctx }) {
   const { user, loc, issueTerminalPO } = ctx;
   const [month, setMonth] = useState(monthKey());
-  const [statusFilter, setStatusFilter] = useState('open'); // open | received | all
+  const [statusFilter, setStatusFilter] = useState('active'); // active(open+draft) | open | draft | received | all
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);     // spend-mode POs at this location
   const [catById, setCatById] = useState({});   // category id -> name
@@ -79,12 +79,18 @@ export default function TerminalPOTab({ ctx }) {
   }, [spendRows, catById]);
   const monthTotal = useMemo(() => spendRows.reduce((a, r) => a + (Number(r.amount) || 0), 0), [spendRows]);
 
-  // PO list: filter by status; "open"/"received" also scoped to the selected month by date_ordered
+  // drafts get their own tile (not scoped to month — a draft holds its number until issued)
+  const draftOrders = useMemo(() => orders.filter(o => o.status === 'draft'), [orders]);
+  const showDraftTile = (statusFilter === 'active' || statusFilter === 'draft' || statusFilter === 'all') && draftOrders.length > 0;
+
+  // PO list: drafts live in the tile, never the table. Month scope applies to open/received.
   const shownOrders = useMemo(() => {
     return orders.filter(o => {
+      if (o.status === 'draft') return false; // tile only
+      if (statusFilter === 'draft') return false; // draft-only view: just the tile
       if (statusFilter === 'open' && o.status !== 'open') return false;
+      if (statusFilter === 'active' && o.status !== 'open') return false; // active table shows open (drafts in tile)
       if (statusFilter === 'received' && o.status !== 'received') return false;
-      // open + received views are scoped to the chosen month; "all" shows everything
       if (statusFilter !== 'all') {
         const k = monthKey(o.date_received || o.date_ordered);
         if (k !== month) return false;
@@ -92,6 +98,15 @@ export default function TerminalPOTab({ ctx }) {
       return true;
     });
   }, [orders, statusFilter, month]);
+
+  async function deleteDraft(o) {
+    if (!window.confirm(`Delete draft PO-${o.po_number}? This removes the draft for good.`)) return;
+    try {
+      await sb.from('fs_order_lines').delete().eq('order_id', o.id);
+      await sb.from('fs_orders').delete().eq('id', o.id);
+      load();
+    } catch (e) { console.warn('delete draft', e); }
+  }
 
   function openPO(id) {
     // open an existing spend PO in FleetStock (carries login + spend mode)
@@ -168,11 +183,38 @@ export default function TerminalPOTab({ ctx }) {
         )}
       </div>
 
+      {/* draft POs tile — started but not yet issued */}
+      {showDraftTile && (
+        <div className="card" style={{ padding: 14, marginBottom: 14, border: '1px solid rgba(110,150,240,0.35)', background: 'rgba(110,150,240,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#5a82d8' }}>📝 Draft POs <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}>// started but not yet issued</span></div>
+            <span className="badge" style={{ background: 'rgba(110,150,240,0.15)', color: '#5a82d8', fontFamily: 'var(--mono, monospace)' }}>{draftOrders.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {draftOrders.map(o => (
+              <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--surface, #fff)', borderRadius: 8, padding: '8px 12px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--mono, monospace)', fontSize: 13, fontWeight: 600 }}>
+                    <span style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => openPO(o.id)}>PO-{o.po_number}</span>
+                    {o.vendor_name ? <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}> · {o.vendor_name}</span> : <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}> · no vendor yet</span>}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11 }}>{o.notes || 'draft terminal PO'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => openPO(o.id)} style={{ fontSize: 11, padding: '5px 11px', borderRadius: 6, cursor: 'pointer', border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 600 }}>complete →</button>
+                  <button onClick={() => deleteDraft(o)} title="delete draft" style={{ fontSize: 13, padding: '5px 9px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--border2, rgba(0,0,0,.12))', background: 'transparent', color: 'var(--muted, #888)' }}>🗑</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* PO list */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>Purchase Orders</div>
         <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-          {[['open', 'Open'], ['received', 'Received'], ['all', 'All']].map(([v, l]) => (
+          {[['active', 'Open + Draft'], ['open', 'Open'], ['draft', 'Draft'], ['received', 'Received'], ['all', 'All']].map(([v, l]) => (
             <button key={v} onClick={() => setStatusFilter(v)} style={{
               fontFamily: 'var(--mono, monospace)', fontSize: 11, padding: '5px 11px', borderRadius: 6, cursor: 'pointer',
               border: '1px solid var(--border2, rgba(0,0,0,.12))',
@@ -186,7 +228,7 @@ export default function TerminalPOTab({ ctx }) {
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? <div className="muted" style={{ padding: 16, fontSize: 12 }}>loading…</div> : shownOrders.length === 0 ? (
           <div className="muted" style={{ padding: 16, fontSize: 12.5 }}>
-            {statusFilter === 'open' ? 'No open terminal POs this month.' : statusFilter === 'received' ? 'No received terminal POs this month.' : 'No terminal POs yet.'} Tap <b>Create PO</b> to start one.
+            {statusFilter === 'draft' ? 'Draft POs are shown in the tile above.' : statusFilter === 'open' || statusFilter === 'active' ? 'No open terminal POs this month.' : statusFilter === 'received' ? 'No received terminal POs this month.' : 'No terminal POs yet.'} Tap <b>Create PO</b> to start one.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
