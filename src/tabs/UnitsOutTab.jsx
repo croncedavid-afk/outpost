@@ -100,7 +100,7 @@ export default function UnitsOutTab({ ctx }) {
       setLoading(false);
     })();
     return () => { alive = false; };
-  }, [loc.id, ctx.user.company_id]);
+  }, [loc.id, ctx.user.company_id, ctx.roOverlayOpen]);
 
   // fetchers (scoped to this terminal + company), mirror Shop Command behavior
   async function fetchUnits(term) {
