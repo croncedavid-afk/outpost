@@ -5,6 +5,7 @@ import RadarTab from './tabs/RadarTab.jsx';
 import UnitsOutTab from './tabs/UnitsOutTab.jsx';
 import SendOutTab from './tabs/SendOutTab.jsx';
 import ApprovalsTab from './tabs/ApprovalsTab.jsx';
+import DefectsTab from './tabs/DefectsTab.jsx';
 import ROPage from './ROPage.jsx';
 import UnitTab from './UnitTab.jsx';
 import ThemeSettings, { initTheme } from './components/ThemeSettings.jsx';
@@ -33,6 +34,7 @@ const APPROVER_ROLES = ['manager', 'terminal_manager', 'director', 'vp', 'admin'
 const TABS = [
   { id: 'radar', label: 'Radar', icon: 'M' },
   { id: 'units_out', label: 'Units Out', icon: 'U' },
+  { id: 'defects', label: 'Defects', icon: 'D' },
   { id: 'terminal_pos', label: 'Terminal POs', icon: 'P' },
   { id: 'send_out', label: 'Send Out', icon: 'S' },
   { id: 'approvals', label: 'Approvals', icon: 'A' },
@@ -401,6 +403,7 @@ export default function App() {
           <>
             {activeTab === 'radar' && <RadarTab ctx={ctx} />}
             {activeTab === 'units_out' && <UnitsOutTab ctx={ctx} />}
+            {activeTab === 'defects' && <DefectsTab ctx={ctx} />}
             {activeTab === 'terminal_pos' && <TerminalPOTab ctx={ctx} />}
             {activeTab === 'send_out' && fullAccess && <SendOutTab ctx={ctx} />}
             {activeTab === 'approvals' && fullAccess && canApprove && <ApprovalsTab ctx={ctx} />}
