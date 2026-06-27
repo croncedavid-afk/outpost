@@ -158,58 +158,89 @@ export default function SendOutTab({ ctx }) {
     setSaving(false);
   }
 
-  const lbl = { fontSize: 11, color: 'var(--muted)', marginBottom: 4, fontFamily: 'var(--mono)' };
+  const lbl = { fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6, fontFamily: 'var(--mono)', letterSpacing: '.3px' };
   const isTrailer = unit?.unit_type === 'trailer';
 
   return (
-    <div style={{ padding: 16, maxWidth: 560 }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)', textTransform: 'uppercase', marginBottom: 12 }}>Send a unit out for outside repair</div>
-      <div className="card" style={{ padding: 18 }}>
+    <div style={{ padding: '20px 16px', maxWidth: 600, margin: '0 auto' }}>
+      {/* header */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)' }}>Send Out</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--muted2)', marginTop: 2 }}>
+          {loc ? `${loc.code} ${loc.name?.replace(' Terminal', '')} · ` : ''}send a unit to an outside vendor for repair
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 22 }}>
         {/* unit */}
-        <div style={{ position: 'relative', marginBottom: 12 }} ref={unitBoxRef}>
-          <div style={lbl}>Unit *</div>
-          <input
-            className="input"
-            placeholder="Type unit number"
-            value={unitQuery}
-            onFocus={() => { setUnitOpen(true); loadUnits(unitQuery.trim()); }}
-            onChange={e => { setUnitQuery(e.target.value); setUnit(null); setUnitOpen(true); }}
-          />
-          {unitOpen && (
-            <div className="card" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, maxHeight: 240, overflowY: 'auto' }}>
-              {unitLoading && <div style={{ padding: '9px 12px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)' }}>Searching…</div>}
-              {!unitLoading && unitMatches.length === 0 && <div style={{ padding: '9px 12px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted2)' }}>No matches at this terminal</div>}
+        <div style={{ position: 'relative', marginBottom: 18 }} ref={unitBoxRef}>
+          <div style={lbl}>Unit <span style={{ color: 'var(--accent)' }}>*</span></div>
+          {unit ? (
+            // selected-unit confirmation chip
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', border: '1.5px solid var(--accent)', borderRadius: 'var(--radius-md)', background: 'var(--green-dim)' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 15 }}>{unit.unit_number}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>
+                  {[unit.year, unit.make, unit.model].filter(Boolean).join(' ') || unit.unit_type}
+                  {unit.mileage != null && <span style={{ color: 'var(--muted2)' }}> · {fmtMiles(unit.mileage)} mi</span>}
+                </div>
+              </div>
+              <button
+                onClick={() => { setUnit(null); setUnitQuery(''); setOdometer(''); setOdoSuggest(null); setUnitOpen(true); setTimeout(() => loadUnits(''), 0); }}
+                style={{ flexShrink: 0, fontFamily: 'var(--mono)', fontSize: 11, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--white)', color: 'var(--muted)', cursor: 'pointer' }}>
+                change
+              </button>
+            </div>
+          ) : (
+            <input
+              className="input"
+              style={{ fontSize: 15, padding: '12px 14px' }}
+              placeholder="Type unit number…"
+              value={unitQuery}
+              onFocus={() => { setUnitOpen(true); loadUnits(unitQuery.trim()); }}
+              onChange={e => { setUnitQuery(e.target.value); setUnit(null); setUnitOpen(true); }}
+            />
+          )}
+          {unitOpen && !unit && (
+            // SOLID opaque dropdown (not the translucent .card) so it cleanly covers fields below
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, marginTop: 6, maxHeight: 280, overflowY: 'auto', background: 'var(--white)', border: '1px solid var(--border2)', borderRadius: 'var(--radius-md)', boxShadow: '0 12px 32px rgba(0,0,0,.16)' }}>
+              {unitLoading && <div style={{ padding: '11px 14px', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--muted2)' }}>Searching…</div>}
+              {!unitLoading && unitMatches.length === 0 && <div style={{ padding: '11px 14px', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--muted2)' }}>No matches at this terminal</div>}
               {!unitLoading && unitMatches.map(u => (
                 <div
                   key={u.id}
                   onMouseDown={(e) => { e.preventDefault(); pickUnit(u); }}
-                  style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                  <span>
+                  style={{ padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13.5, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <span style={{ minWidth: 0 }}>
                     <span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{u.unit_number}</span>
                     <span style={{ color: 'var(--muted)', marginLeft: 8 }}>{[u.year, u.make, u.model].filter(Boolean).join(' ') || u.unit_type}</span>
                   </span>
-                  {u.mileage != null && <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted2)', whiteSpace: 'nowrap' }}>{fmtMiles(u.mileage)} mi</span>}
+                  {u.mileage != null && <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--muted2)', whiteSpace: 'nowrap' }}>{fmtMiles(u.mileage)} mi</span>}
                 </div>
               ))}
             </div>
           )}
         </div>
+
         {/* vendor */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={lbl}>Vendor *</div>
-          <select className="select" value={vendorId} onChange={e => setVendorId(e.target.value)}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={lbl}>Vendor <span style={{ color: 'var(--accent)' }}>*</span></div>
+          <select className="select" style={{ fontSize: 14, padding: '12px 14px' }} value={vendorId} onChange={e => setVendorId(e.target.value)}>
             <option value="">Choose a vendor…</option>
             {vendors.map(v => <option key={v.id} value={v.id}>{v.name}{v.city ? ` — ${v.city}, ${v.state}` : ''}</option>)}
           </select>
         </div>
+
         {/* odometer */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={lbl}>Odometer {isTrailer ? '(optional — trailer)' : '(optional)'}</div>
-          <input className="input" type="number" inputMode="numeric" placeholder={isTrailer ? 'hub odometer, if equipped' : 'current miles'} value={odometer} onChange={e => setOdometer(e.target.value)} />
+        <div style={{ marginBottom: 18 }}>
+          <div style={lbl}>Odometer <span style={{ color: 'var(--muted2)', fontWeight: 400 }}>{isTrailer ? '(optional — trailer)' : '(optional)'}</span></div>
+          <input className="input" style={{ fontSize: 14, padding: '12px 14px' }} type="number" inputMode="numeric" placeholder={isTrailer ? 'hub odometer, if equipped' : 'current miles'} value={odometer} onChange={e => setOdometer(e.target.value)} />
           {odoSuggest && (
             <div
               onMouseDown={(e) => { e.preventDefault(); useSuggestion(); }}
-              style={{ marginTop: 6, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              style={{ marginTop: 8, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--muted)' }}>Last reading:</span>
               <strong>{fmtMiles(odoSuggest.odometer)} mi</strong>
               <span style={{ color: 'var(--muted2)' }}>· {odoSuggest.source} · {fmtDate(odoSuggest.reading_date)}</span>
@@ -217,14 +248,16 @@ export default function SendOutTab({ ctx }) {
             </div>
           )}
         </div>
+
         {/* reason */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={lbl}>Reason / complaint *</div>
-          <textarea className="textarea" rows={2} placeholder="e.g. PM A due; air leak; DOT inspection" value={reason} onChange={e => setReason(e.target.value)} />
+        <div style={{ marginBottom: 20 }}>
+          <div style={lbl}>Reason / complaint <span style={{ color: 'var(--accent)' }}>*</span></div>
+          <textarea className="textarea" style={{ fontSize: 14, padding: '12px 14px', minHeight: 80, resize: 'vertical' }} rows={3} placeholder="e.g. PM A due; air leak; DOT inspection" value={reason} onChange={e => setReason(e.target.value)} />
         </div>
-        {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent)', marginBottom: 10 }}>⚠ {err}</div>}
-        {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', marginBottom: 10 }}>✓ {msg}</div>}
-        <button className="btn btn-primary" onClick={send} disabled={saving} style={{ width: '100%' }}>{saving ? 'Creating…' : 'Create Outside RO'}</button>
+
+        {err && <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--accent)', marginBottom: 12, padding: '8px 12px', background: 'rgba(142,0,0,.06)', borderRadius: 6 }}>⚠ {err}</div>}
+        {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--green)', marginBottom: 12, padding: '8px 12px', background: 'var(--green-dim)', borderRadius: 6 }}>✓ {msg}</div>}
+        <button className="btn btn-primary" onClick={send} disabled={saving} style={{ width: '100%', fontSize: 15, padding: '13px' }}>{saving ? 'Creating…' : 'Create Outside RO'}</button>
       </div>
     </div>
   );
