@@ -13,6 +13,8 @@ import ThemeSettings, { initTheme } from './components/ThemeSettings.jsx';
 function readInitialUser() {
   try {
     const params = new URLSearchParams(window.location.search);
+    // remember if we're returning from a cross-app PO (FleetStock) before the URL is stripped
+    if (params.get('back') === '1') { try { window.__opReturnTab = 'terminal_pos'; } catch {} }
     const encoded = params.get('shell_user');
     if (encoded) {
       const u = JSON.parse(atob(encoded));
@@ -41,7 +43,10 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPw, setLoginPw] = useState('');
   const [loginErr, setLoginErr] = useState('');
-  const [activeTab, setActiveTab] = useState('radar');
+  const [activeTab, setActiveTab] = useState(() => {
+    try { if (window.__opReturnTab) { const t = window.__opReturnTab; delete window.__opReturnTab; return t; } } catch {}
+    return 'radar';
+  });
   const [showTheme, setShowTheme] = useState(false);
   const [loc, setLoc] = useState(null);          // { id, code, name }
   const [serviceModel, setServiceModel] = useState(null); // 'vendor_based' | 'in_house_shop' | null
@@ -57,11 +62,13 @@ export default function App() {
   // there's no second login, and the active terminal so the PO lands on it.
   const FLEETSTOCK_URL = 'https://fleetstock-git-main-fleet-solutions-platform.vercel.app';
   const issueTerminalPO = useCallback(() => {
+    // navigate IN-APP (same window) so the PWA isn't kicked out to a browser tab —
+    // matches the dashboard handoff (window.location.href), not window.open(_blank).
     try {
       const su = '&shell_user=' + btoa(JSON.stringify(user));
       const lp = loc?.id ? '&loc=' + encodeURIComponent(loc.id) : '';
-      window.open(FLEETSTOCK_URL + '/?po=new&mode=spend&origin=outpost' + lp + su, '_blank');
-    } catch { window.open(FLEETSTOCK_URL + '/?po=new&mode=spend&origin=outpost', '_blank'); }
+      window.location.href = FLEETSTOCK_URL + '/?po=new&mode=spend&origin=outpost' + lp + su;
+    } catch { window.location.href = FLEETSTOCK_URL + '/?po=new&mode=spend&origin=outpost'; }
   }, [user, loc]);
   const openRO = useCallback((ro) => setOverlay({ type: 'ro', ro }), []);
   const openUnit = useCallback((unitId) => setOverlay({ type: 'unit', unitId }), []);
