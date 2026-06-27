@@ -2619,6 +2619,14 @@ export default function ROPage({ ro, onBack, user, isTech, kind, readOnly = fals
       // parts (incl. outside tire records), then jobs, then the header (correct table)
       if (jobIds.length) await sb.from('job_parts').delete().in('job_id', jobIds);
       await sb.from('ro_jobs').delete().eq('ro_id', ro.id);
+      // unlink any unit defects pointing at this RO -> back to the open list
+      try {
+        await sb.from('unit_defects')
+          .update({ status: 'open', ro_number: null, ro_kind: null, completed_at: null })
+          .eq('ro_number', roData.ro_number)
+          .eq('ro_kind', isOutside ? 'outside' : 'inside')
+          .in('status', ['linked', 'completed']);
+      } catch {}
       const { error } = await sb.from(RO_TABLE).delete().eq('id', ro.id);
       if (error) throw error;
       onBack();
