@@ -59,7 +59,7 @@ export default function DefectsTab({ ctx }) {
       setDefects(data || []);
     } finally { setLoading(false); }
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [loc.id, user.company_id]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [loc.id, user.company_id, ctx.roOverlayOpen]);
 
   const open = useMemo(() => {
     // OOS first, then minor; within each, longest-open (oldest reported) first.
@@ -74,6 +74,14 @@ export default function DefectsTab({ ctx }) {
   const completed = useMemo(() =>
     defects.filter(d => d.status === 'completed')
       .sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0)),
+  [defects]);
+
+  const linked = useMemo(() =>
+    defects.filter(d => d.status === 'linked')
+      .sort((a, b) => {
+        const rank = s => (s === 'oos' ? 0 : 1);
+        return rank(a.severity) - rank(b.severity) || new Date(a.reported_at) - new Date(b.reported_at);
+      }),
   [defects]);
 
   const oosCount = open.filter(d => d.severity === 'oos').length;
@@ -100,7 +108,7 @@ export default function DefectsTab({ ctx }) {
 
       {/* sub-tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-        {[['open', `Open${open.length ? ` (${open.length})` : ''}`], ['completed', 'Completed']].map(([id, label]) => (
+        {[['open', `Open${open.length ? ` (${open.length})` : ''}`], ['linked', `In repair${linked.length ? ` (${linked.length})` : ''}`], ['completed', 'Completed']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
             padding: '9px 14px', fontSize: 13, fontWeight: tab === id ? 600 : 400,
             color: tab === id ? 'var(--accent)' : 'var(--muted)', background: 'none', border: 'none',
@@ -127,6 +135,21 @@ export default function DefectsTab({ ctx }) {
             {open.map(d => (
               <DefectCard key={d.id} d={d} fullAccess={fullAccess}
                 onLink={() => setLinkFor(d)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {!loading && tab === 'linked' && (
+        <>
+          {linked.length === 0 && (
+            <div className="card glow-skip" style={{ padding: 28, textAlign: 'center', color: 'var(--muted)', fontSize: 13.5 }}>
+              No defects in repair right now.
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {linked.map(d => (
+              <LinkedCard key={d.id} d={d} openRO={openRO} />
             ))}
           </div>
         </>
@@ -215,6 +238,46 @@ function CompletedCard({ d, openRO }) {
             {d.ro_number ? <> · RO <strong style={{ color: 'var(--text)' }}>{d.ro_number}</strong>{d.ro_kind ? ` (${d.ro_kind})` : ''}</> : ''}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── one linked / in-repair defect card ─────────────────────────── */
+function LinkedCard({ d, openRO }) {
+  const oos = d.severity === 'oos';
+  const canOpen = typeof openRO === 'function' && d.ro_number;
+
+  async function openLinkedRO() {
+    const table = d.ro_kind === 'outside' ? 'outside_ros' : 'ro_headers';
+    const { data } = await sb.from(table).select('*').eq('ro_number', d.ro_number)
+      .order('created_at', { ascending: false }).limit(1);
+    const row = (data || [])[0];
+    if (row) openRO({ ...row, kind: d.ro_kind });
+  }
+
+  return (
+    <div className="card glow-skip" style={{ padding: '13px 16px', borderLeft: `3px solid var(--blue)` }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 15 }}>{d.unit_number}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, letterSpacing: '.4px', padding: '2px 7px', borderRadius: 4, color: '#fff', background: oos ? 'var(--accent)' : 'var(--amber)' }}>
+              {oos ? 'OOS' : 'MINOR'}
+            </span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, color: 'var(--blue)', background: 'var(--blue-dim)' }}>● in repair</span>
+          </div>
+          <div style={{ fontSize: 13.5, color: 'var(--text)', lineHeight: 1.4 }}>{d.description}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--muted2)', marginTop: 6 }}>
+            On RO <strong style={{ color: 'var(--text)' }}>{d.ro_number}</strong>{d.ro_kind ? ` (${d.ro_kind})` : ''} · completes when the RO is finished
+          </div>
+        </div>
+        {canOpen && (
+          <button className="btn" onClick={openLinkedRO}
+            style={{ flexShrink: 0, fontSize: 12, padding: '8px 14px', border: '1px solid var(--blue)', color: 'var(--blue)', background: 'var(--white)', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
+            Open RO
+          </button>
+        )}
       </div>
     </div>
   );
@@ -404,10 +467,9 @@ function LinkROModal({ ctx, defect, onClose, onLinked }) {
     });
     if (jErr) throw jErr;
     const { error: dErr } = await sb.from('unit_defects').update({
-      status: 'completed',
+      status: 'linked',
       ro_number: roNumber,
       ro_kind: 'outside',
-      completed_at: new Date().toISOString(),
     }).eq('id', defect.id);
     if (dErr) throw dErr;
   }
